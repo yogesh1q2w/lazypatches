@@ -15,3 +15,19 @@ For GPU usage:
 ```docker build -t qwen2-pytorch-gpu -f docker/transformers-pytorch-gpu/Dockerfile .```
 
 Check [./docker/README.md](./docker/README.md) for more details
+
+
+# Run in the container
+
+For CPU usage: 
+
+```docker run -it -v ${HOME}/lazypatches/:/home  qwen-pytorch-fast-cpu bash```
+
+
+For GPU usage:
+
+```docker run -it -v ${HOME}/lazypatches/:/home  qwen2-pytorch-gpu bash```
+
+
+
+
