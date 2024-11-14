@@ -8,6 +8,8 @@ A spatio-temporal video subsampling strategy for efficient video-language modell
 For CPU usage: 
 
 ```docker build -t qwen-pytorch-fast-cpu -f docker/consistency.dockerfile .```
+
+
 For GPU usage:
 
 ```docker build -t qwen2-pytorch-gpu -f docker/transformers-pytorch-gpu/Dockerfile .```
