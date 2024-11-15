@@ -26,7 +26,7 @@ For CPU usage:
 
 For GPU usage:
 
-```docker run -it -v ${HOME}/lazypatches/:/home  qwen2-pytorch-gpu bash```
+```docker_run_nvidia -v ${HOME}/lazypatches/:/home  qwen2-pytorch-gpu bash```
 
 
 
