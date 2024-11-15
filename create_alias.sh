@@ -1,3 +1,4 @@
+
 echo 'alias docker_run_no_gpu="docker run -it --net=host \
         --privileged \
         --env="DISPLAY" \
