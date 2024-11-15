@@ -28,6 +28,10 @@ For GPU usage:
 
 ```docker_run_nvidia -v ${HOME}/lazypatches/:/home  qwen2-pytorch-gpu bash```
 
+# Get into a running container
+
+```docker exec -it <container-id> bash```
+
 
 
 
