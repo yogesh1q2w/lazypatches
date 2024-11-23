@@ -37,5 +37,10 @@ For GPU usage:
 
 ```apptainer build qwen2-pytorch-gpu.sif  docker://levoz/lazypatches:qwen2-pytorch-gpu```
 
+# Run in the Apptainer
+
+```apptainer exec qwen2-pytorch-gpu.sif bash```
+
+
 
 
