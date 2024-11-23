@@ -33,5 +33,9 @@ For GPU usage:
 ```docker exec -it <container-id> bash```
 
 
+# Converting to Apptainer
+
+```apptainer build qwen2-pytorch-gpu.sif  docker://levoz/lazypatches:qwen2-pytorch-gpu```
+
 
 
