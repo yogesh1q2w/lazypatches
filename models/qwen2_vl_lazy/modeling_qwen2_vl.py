@@ -407,11 +407,55 @@ class VisionSdpaAttention(nn.Module):
         attn_output = self.proj(attn_output)
         return attn_output
 
+class RandomDropVisionAttention(VisionAttention):
+    def __init__(self, dim: int, num_heads: int = 16, drop_prob: float = 0.1) -> None:
+        """
+        Initialize the RandomDropVisionAttention module.
+
+        Args:
+            dim (int): Dimensionality of the input features.
+            num_heads (int): Number of attention heads.
+            drop_prob (float): Probability of dropping a token.
+        """
+        super().__init__(dim, num_heads)
+        self.drop_prob = drop_prob
+
+    def forward(
+        self, hidden_states: torch.Tensor, cu_seqlens: torch.Tensor, rotary_pos_emb: torch.Tensor = None
+    ) -> torch.Tensor:
+        """
+        Forward pass with random token removal.
+
+        Args:
+            hidden_states (torch.Tensor): Input tensor of shape (seq_length, dim).
+            cu_seqlens (torch.Tensor): Cumulative sequence lengths for masking.
+            rotary_pos_emb (torch.Tensor): Rotary position embeddings (optional).
+
+        Returns:
+            torch.Tensor: Output tensor after applying attention with token dropping.
+        """
+        # Randomly decide which tokens to keep
+        seq_length, dim = hidden_states.shape
+        keep_mask = torch.rand(seq_length, device=hidden_states.device) >= self.drop_prob
+        kept_indices = torch.nonzero(keep_mask, as_tuple=True)[0]  # Indices of tokens to keep
+        hidden_states = hidden_states[kept_indices]  # Remove dropped tokens
+
+        # Adjust cu_seqlens to reflect the dropped tokens
+        new_cu_seqlens = [0]
+        for i in range(1, len(cu_seqlens)):
+            start, end = cu_seqlens[i - 1], cu_seqlens[i]
+            kept_in_range = keep_mask[start:end].sum().item()
+            new_cu_seqlens.append(new_cu_seqlens[-1] + kept_in_range)
+        new_cu_seqlens = torch.tensor(new_cu_seqlens, device=cu_seqlens.device)
+
+        # Call the parent class forward method with adjusted inputs
+        return super().forward(hidden_states, new_cu_seqlens, rotary_pos_emb)
 
 QWEN2_VL_VISION_ATTENTION_CLASSES = {
     "eager": VisionAttention,
     "flash_attention_2": VisionFlashAttention2,
     "sdpa": VisionSdpaAttention,
+    "random_drop": RandomDropVisionAttention
 }
 
 
