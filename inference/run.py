@@ -7,10 +7,10 @@ from typing import Dict
 from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
 
 
-checkpoint_path = "/home/atuin/g102ea/shared/group_10/models"
+checkpoint_path = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
 
 # Load the model in half-precision on the available device(s)
-model = Qwen2VLForConditionalGeneration.from_pretrained(checkpoint_path, device_map="auto")
+model = Qwen2VLForConditionalGeneration.from_pretrained(checkpoint_path, device_map="auto", torch_dtype="auto")
 processor = AutoProcessor.from_pretrained(checkpoint_path)
 
 print("Loading model complete")
@@ -37,7 +37,7 @@ text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=
 # Excepted output: '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>Describe this image.<|im_end|>\n<|im_start|>assistant\n'
 
 inputs = processor(text=[text_prompt], images=[image], padding=True, return_tensors="pt")
-# inputs = inputs.to('cuda')
+inputs = inputs.to('cuda')
 
 # Inference: Generation of the output
 output_ids = model.generate(**inputs, max_new_tokens=128)
@@ -46,7 +46,7 @@ output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, cl
 print(output_text)
 
 
-'''
+
 # Video
 def fetch_video(ele: Dict, nframe_factor=2):
     if isinstance(ele['video'], str):
@@ -80,7 +80,7 @@ conversation = [
         "role": "user",
         "content": [
             {"type": "video"},
-            {"type": "text", "text": "What is the person saying in the video?"},
+            {"type": "text", "text": "What is the person saying in the video? Hint: Its quite negative"},
         ],
     }
 ]
@@ -90,11 +90,10 @@ text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=
 # Excepted output: '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|video_pad|><|vision_end|>What happened in the video?<|im_end|>\n<|im_start|>assistant\n'
 
 inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt")
-# inputs = inputs.to('cuda')
+inputs = inputs.to('cuda')
 
 # Inference: Generation of the output
 output_ids = model.generate(**inputs, max_new_tokens=128)
 generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
 output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
 print(output_text)
-'''
