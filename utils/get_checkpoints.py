@@ -1,8 +1,8 @@
-from transformers import AutoProcessor, Qwen2VLForConditionalGeneration, TextIteratorStreamer,AutoTokenizer
+from transformers import AutoProcessor, Qwen2VLForConditionalGeneration, AutoTokenizer
 
 # Define the model name and the local directory to save the model
 model_name = "Qwen/Qwen2-VL-7B-Instruct"
-save_directory = "../checkpoints/qwen2-vl-checkpoint"  # Set your desired path
+save_directory = "/home/atuin/g102ea/shared/group_10/models"  # Set your desired path
 
 # Download and save the model, tokenizer, and processor
 model = Qwen2VLForConditionalGeneration.from_pretrained(model_name)

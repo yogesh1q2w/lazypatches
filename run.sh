@@ -1,0 +1,9 @@
+#!/bin/bash -l
+#
+#SBATCH --gres=gpu:a100:1
+#SBATCH --time=00:10:00 
+#SBATCH --job-name=run
+#SBATCH --output=/home/hpc/g102ea/g102ea11/m3-project/lazypatches/eval.log
+#SBATCH --export=None
+
+apptainer exec qwen2-pytorch-gpu.sif python3 inference/run.py > output.out

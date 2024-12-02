@@ -1,2 +1,5 @@
-checkpoints/
 *.sif
+*.log
+*.jpg
+*.mp4
+*.out
