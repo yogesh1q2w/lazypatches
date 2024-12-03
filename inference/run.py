@@ -4,17 +4,18 @@ import requests
 import torch
 from torchvision import io
 from typing import Dict
-from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+from transformers import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
+
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 checkpoint_path = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
 
-# Load the model in half-precision on the available device(s)
 model = Qwen2VLForConditionalGeneration.from_pretrained(checkpoint_path, device_map="auto", torch_dtype="auto")
-processor = AutoProcessor.from_pretrained(checkpoint_path)
+processor = Qwen2VLProcessor.from_pretrained(checkpoint_path, max_pixels=202500)
 
 print("Loading model complete")
-image = Image.open("./image.jpg")
+image = Image.open("./test_files/image.jpg")
 
 conversation = [
     {
@@ -25,7 +26,7 @@ conversation = [
             },
             {
                 "type":"text",
-                "text":"Which country does this person belong to? Give one precise answer."
+                "text":"Describe the picture."
             }
         ]
     }
@@ -37,7 +38,7 @@ text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=
 # Excepted output: '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|image_pad|><|vision_end|>Describe this image.<|im_end|>\n<|im_start|>assistant\n'
 
 inputs = processor(text=[text_prompt], images=[image], padding=True, return_tensors="pt")
-inputs = inputs.to('cuda')
+inputs = inputs.to(DEVICE)
 
 # Inference: Generation of the output
 output_ids = model.generate(**inputs, max_new_tokens=128)
@@ -64,6 +65,8 @@ def fetch_video(ele: Dict, nframe_factor=2):
             pts_unit="sec",
             output_format="TCHW",
         )
+        print(info)
+        print(video.shape)
         assert not ("fps" in ele and "nframes" in ele), "Only accept either `fps` or `nframes`"
         if "nframes" in ele:
             nframes = round_by_factor(ele["nframes"], nframe_factor)
@@ -73,14 +76,14 @@ def fetch_video(ele: Dict, nframe_factor=2):
         idx = torch.linspace(0, video.size(0) - 1, nframes, dtype=torch.int64)
         return video[idx]
 
-video_info = {"type": "video", "video": "./test.mp4", "fps": 2.0}
+video_info = {"type": "video", "video": "./test_files/video.mp4", "fps": 1.0}
 video = fetch_video(video_info)
 conversation = [
     {
         "role": "user",
         "content": [
             {"type": "video"},
-            {"type": "text", "text": "What is the person saying in the video? Hint: Its quite negative"},
+            {"type": "text", "text": "Describe the video."},
         ],
     }
 ]
@@ -89,8 +92,8 @@ conversation = [
 text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
 # Excepted output: '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|video_pad|><|vision_end|>What happened in the video?<|im_end|>\n<|im_start|>assistant\n'
 
-inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt")
-inputs = inputs.to('cuda')
+inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt", do_resize=True, size=140)
+inputs = inputs.to(DEVICE)
 
 # Inference: Generation of the output
 output_ids = model.generate(**inputs, max_new_tokens=128)
