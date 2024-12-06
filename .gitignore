@@ -1,2 +1,11 @@
-checkpoints/
 *.sif
+*.log
+*.jpg
+*.mp4
+!test_files
+!test_files/image.jpg
+!test_files/video.mp4
+*.out
+env
+.env
+__pycache__

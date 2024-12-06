@@ -6,7 +6,7 @@ from PIL import Image
 import numpy as np
 from glob import glob
 import csv
-import cPickle as pickle
+import pickle
 import os
 
 from torchvision import io
@@ -51,21 +51,21 @@ def pil_loader(path):
         return img.convert('RGB')
 
 
-def accimage_loader(path):
-    import accimage
-    try:
-        return accimage.Image(path)
-    except IOError:
-        # Potentially a decoding problem, fall back to PIL.Image
-        return pil_loader(path)
+# def accimage_loader(path):
+#     import accimage
+#     try:
+#         return accimage.Image(path)
+#     except IOError:
+#         # Potentially a decoding problem, fall back to PIL.Image
+#         return pil_loader(path)
 
 
-def default_loader(path):
-    from torchvision import get_image_backend
-    if get_image_backend() == 'accimage':
-        return accimage_loader(path)
-    else:
-        return pil_loader(path)
+# def default_loader(path):
+#     from torchvision import get_image_backend
+#     if get_image_backend() == 'accimage':
+#         return accimage_loader(path)
+#     else:
+#         return pil_loader(path)
 
 
 def cache(cachefile):
@@ -142,7 +142,7 @@ class Charades_decription(data.Dataset):
             targets.append(label)
             ids.append(vid)
                 
-        return {'image_paths': video_paths, 'targets': targets, 'ids': ids}
+        return {'video_paths': video_paths, 'targets': targets, 'ids': ids}
 
     def __getitem__(self, index):
         """
@@ -167,6 +167,7 @@ class Charades_decription(data.Dataset):
                 ]
             }
         ]
+        print(path)
         
         return video, conversation, target
 
