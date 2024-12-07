@@ -19,8 +19,8 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 checkpoint_path = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"  
 
 # Load the model in half-precision on the available device(s)
-model = Qwen2VLForConditionalGeneration.from_pretrained(checkpoint_path, device_map="auto", torch_dtype="auto")
-processor = AutoProcessor.from_pretrained(checkpoint_path, max_pixels=202500)
+# model = Qwen2VLForConditionalGeneration.from_pretrained(checkpoint_path, device_map="auto", torch_dtype="auto")
+# processor = AutoProcessor.from_pretrained(checkpoint_path, max_pixels=202500)
 
 print("Loading model complete")
 # Image

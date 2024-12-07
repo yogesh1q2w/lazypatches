@@ -24,8 +24,7 @@ def parse_charades_csv(filename):
                 actions = []
             else:
                 actions = [a.split(' ') for a in actions.split(';')]
-                actions = [{'class': x, 'start': float(
-                    y), 'end': float(z)} for x, y, z in actions]
+                actions = [{'class': x} for x, y, z in actions]
             labels[vid] = actions
     return labels
 
@@ -120,7 +119,7 @@ class Charades_decription(data.Dataset):
         self.num_classes = 157
         self.transform = transform
         self.target_transform = target_transform
-        self.labels = parse_charades_csv_video(labelpath)
+        self.labels = parse_charades_csv(labelpath)
         self.root = root
         # cachename = '{}/{}_{}.pkl'.format(cachedir,
                                         #   self.__class__.__name__, split)
@@ -144,6 +143,7 @@ class Charades_decription(data.Dataset):
             
             video_path = '{}/{}.mp4'.format(
                             datadir, vid)
+            print(label)
             video_paths.append(video_path)
             targets.append(label)
             ids.append(vid)
