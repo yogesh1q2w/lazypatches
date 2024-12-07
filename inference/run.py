@@ -14,12 +14,15 @@ dataset = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(dataset)
 from dataset.charadesdescription import Charades_decription
 
-checkpoint_path = "/home/checkpoints/qwen2-vl-checkpoint"  
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+checkpoint_path = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"  
 
 # Load the model in half-precision on the available device(s)
-model = Qwen2VLForConditionalGeneration.from_pretrained(checkpoint_path, device_map="auto")
-processor = AutoProcessor.from_pretrained(checkpoint_path)
+model = Qwen2VLForConditionalGeneration.from_pretrained(checkpoint_path, device_map="auto", torch_dtype="auto")
+processor = AutoProcessor.from_pretrained(checkpoint_path, max_pixels=202500)
 
+print("Loading model complete")
 # Image
 # url = "https://qianwen-res.oss-cn-beijing.aliyuncs.com/Qwen-VL/assets/demo.jpeg"
 # image = Image.open(requests.get(url, stream=True).raw)
@@ -91,33 +94,35 @@ processor = AutoProcessor.from_pretrained(checkpoint_path)
 #     }
 # ]
 
-charades_dataset = Charades_decription(root="/home/autin/g102ea/g102ea12/dataset/charades/videos/Charades_v1",
+charades_dataset = Charades_decription(root="/home/atuin/g102ea/g102ea12/dataset/charades/videos/Charades_v1",
                                 split="val_video",
-                                labelpath="/home/autin/g102ea/g102ea12/dataset/charades/anotations/Charades_v1_test.csv",
-                                cachedir=""
+                                labelpath="/home/atuin/g102ea/g102ea12/dataset/charades/anotations/Charades/Charades_v1_test.csv",
+                                cachedir="/home/atuin/g102ea/g102ea12/dataset/charades/cache"
                                 )
 batch_size = 1
 shuffle = True
-num_workers = 4
+num_workers = 1
 data_loader = DataLoader(dataset=charades_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
-video, text, target = next(data_loader)
+data_loader_iter = iter(data_loader)
+video, conversation, target = next(data_loader_iter)
 
-conversation = [
-    {
-        "role": "user",
-        "content": [
-            {"type": "video"},
-            {"type": "text", "text": text},
-        ],
-    }
-]
+print(video.shape)
+# conversation = [
+#     {
+#         "role": "user",
+#         "content": [
+#             {"type": "video"},
+#             {"type": "text", "text": text},
+#         ],
+#     }
+# ]
 
 # Preprocess the inputs
 text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
 # Excepted output: '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|video_pad|><|vision_end|>What happened in the video?<|im_end|>\n<|im_start|>assistant\n'
 
-inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt")
-inputs = inputs.to('cuda')
+inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt", do_resize=True, size=140)
+inputs = inputs.to(DEVICE)
 
 # Inference: Generation of the output
 output_ids = model.generate(**inputs, max_new_tokens=128)
