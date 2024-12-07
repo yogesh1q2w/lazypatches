@@ -12,7 +12,7 @@ import sys
 import os
 dataset = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 sys.path.append(dataset)
-from dataset.charadesaction import Charades_action
+from dataset.charadesdescription import Charades_decription
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -94,10 +94,9 @@ print("Loading model complete")
 #     }
 # ]
 
-charades_dataset = Charades_action(root="/home/atuin/g102ea/g102ea12/dataset/charades/videos/Charades_v1",
+charades_dataset = Charades_decription(root="/home/atuin/g102ea/g102ea12/dataset/charades/videos/Charades_v1",
                                 split="val_video",
                                 labelpath="/home/atuin/g102ea/g102ea12/dataset/charades/anotations/Charades/Charades_v1_test.csv",
-                                classespath="/home/atuin/g102ea/g102ea12/dataset/charades/anotations/Charades/Charades_v1_classes.txt",
                                 cachedir="/home/atuin/g102ea/g102ea12/dataset/charades/cache"
                                 )
 batch_size = 1
@@ -105,35 +104,32 @@ shuffle = True
 num_workers = 0
 data_loader = DataLoader(dataset=charades_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
 data_loader_iter = iter(data_loader)
-for i in range(5):
-    video, question, answer = next(data_loader_iter)
-    print(question)
-    print(answer[0])
-    # print("before handle:", video.shape)
-    video = video.squeeze(0)
-    # print("input:", video.shape)
+video, text, target = next(data_loader_iter)
 
-    conversation = [
-        {
-            "role": "user",
-            "content": [
-                {"type": "video"},
-                {"type": "text", "text": question[0]},
-            ],
-        }
-    ]
-    # print(conversation)
+print("before handle:", video.shape)
+video = video.squeeze(0)
+print("input:", video.shape)
 
-    # Preprocess the inputs
-    text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
-    # Excepted output: '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|video_pad|><|vision_end|>What happened in the video?<|im_end|>\n<|im_start|>assistant\n'
+conversation = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "video"},
+            {"type": "text", "text": text[0]},
+        ],
+    }
+]
+print(conversation)
 
-    inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt", do_resize=True, size=140)
-    inputs = inputs.to(DEVICE)
+# Preprocess the inputs
+text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
+# Excepted output: '<|im_start|>system\nYou are a helpful assistant.<|im_end|>\n<|im_start|>user\n<|vision_start|><|video_pad|><|vision_end|>What happened in the video?<|im_end|>\n<|im_start|>assistant\n'
 
-    # Inference: Generation of the output
-    output_ids = model.generate(**inputs, max_new_tokens=128)
-    generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
-    output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-    torch.cuda.empty_cache()
-    print(output_text)
+inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt", do_resize=True, size=140)
+inputs = inputs.to(DEVICE)
+
+# Inference: Generation of the output
+output_ids = model.generate(**inputs, max_new_tokens=128)
+generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
+output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+print(output_text)

@@ -145,6 +145,7 @@ class Charades_decription(data.Dataset):
             video_path = '{}/{}.mp4'.format(
                             datadir, vid)
             video_paths.append(video_path)
+            print(label)
             targets.append(label)
             ids.append(vid)
                 
