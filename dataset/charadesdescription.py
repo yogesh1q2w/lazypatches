@@ -35,7 +35,7 @@ def parse_charades_csv_video(filename):
         reader = csv.DictReader(f)
         for row in reader:
             vid = row['id']
-            description = row['description']
+            description = row['descriptions']
             labels[vid] = description
     return labels
 
@@ -107,6 +107,7 @@ def fetch_video(ele: Dict, nframe_factor=2):
     else:
         fps = ele.get("fps", 1.0)
         nframes = round_by_factor(video.size(0) / info["video_fps"] * fps, nframe_factor)
+    print(video.size(0), info["video_fps"], nframes)
     idx = torch.linspace(0, video.size(0) - 1, nframes, dtype=torch.int64)
     return video[idx]
 
@@ -118,26 +119,28 @@ class Charades_decription(data.Dataset):
         self.target_transform = target_transform
         self.labels = parse_charades_csv_video(labelpath)
         self.root = root
-        cachename = '{}/{}_{}.pkl'.format(cachedir,
-                                          self.__class__.__name__, split)
-        self.data = cache(cachename)(self.prepare)(root, self.labels)
-        
-
+        # cachename = '{}/{}_{}.pkl'.format(cachedir,
+                                        #   self.__class__.__name__, split)
+        # self.data = cache(cachename)(self.prepare)(root, self.labels)
+        self.data = self.prepare(root, self.labels)
+    
     def prepare(self, path, labels):
         datadir = path
         video_paths, targets, ids = [], [], []
 
-        for i, (vid, label) in enumerate(labels.iteritems()):
-            iddir = datadir + '/' + vid
-            lines = glob(iddir+'/*.jpg')
-            n = len(lines)
-            if i % 100 == 0:
-                print("{} {}".format(i, iddir))
-            if n == 0:
-                continue
+        for i, (vid, label) in enumerate(labels.items()):
+            # iddir = datadir + '/' + vid
+            # lines = glob(datadir)
+
+            # n = len(lines)
+            # print("video_length:",n)
+            # if i % 100 == 0:
+            #     print("{} {}".format(i, datadir))
+            # if n == 0:
+            #     continue
             
             video_path = '{}/{}.mp4'.format(
-                            iddir, vid)
+                            datadir, vid)
             video_paths.append(video_path)
             targets.append(label)
             ids.append(vid)
@@ -172,7 +175,8 @@ class Charades_decription(data.Dataset):
         return video, conversation, target
 
     def __len__(self):
-        return len(self.data['image_paths'])
+        # print(len(self.data['video_paths']))
+        return len(self.data['video_paths'])
 
     def __repr__(self):
         fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
