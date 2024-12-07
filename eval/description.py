@@ -24,3 +24,8 @@ class IncrementalBleuScorer:
 
     def get_average_score(self):
         return self.total_score / self.count if self.count > 0 else 0
+
+
+test = IncrementalBleuScorer()
+test.add_sample('A person ins walking through a door way and is holding a pillow. The person opens a closet door and puts the pillow in there. The person is also tidying up the closet. The person then looks in a mirror and stairs at themselves.', 'The video shows a young boy entering a room and walking towards a closet. He then opens the closet door and places a towel inside. After that, he walks towards a mirror and stands in front of it. The video ends with the boy walking away from the mirror.')
+print(test.get_all_scores())

@@ -101,6 +101,9 @@ def fetch_video(ele: Dict, nframe_factor=2):
         pts_unit="sec",
         output_format="TCHW",
     )
+
+    print(info)
+    print(video.shape)
     assert not ("fps" in ele and "nframes" in ele), "Only accept either `fps` or `nframes`"
     if "nframes" in ele:
         nframes = round_by_factor(ele["nframes"], nframe_factor)
@@ -155,24 +158,17 @@ class Charades_decription(data.Dataset):
             tuple: (frames, conversation, target_description).
         """
         path = self.data['video_paths'][index]
+        print(path)
         target = self.data['targets'][index]
         meta = {}
         meta['id'] = self.data['ids'][index]
         
         video_info = {"type": "video", "video": path, "fps": 1.0}
         video = fetch_video(video_info)
-        conversation = [
-            {
-                "role":"user",
-                "content":[
-                    {"type":"video"},
-                    {"type":"text", "text":"Describe this video."}
-                ]
-            }
-        ]
+        text = "Describe the video."
         print(path)
         
-        return video, conversation, target
+        return video, text, target
 
     def __len__(self):
         # print(len(self.data['video_paths']))

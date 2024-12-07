@@ -101,21 +101,25 @@ charades_dataset = Charades_decription(root="/home/atuin/g102ea/g102ea12/dataset
                                 )
 batch_size = 1
 shuffle = True
-num_workers = 1
+num_workers = 0
 data_loader = DataLoader(dataset=charades_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
 data_loader_iter = iter(data_loader)
-video, conversation, target = next(data_loader_iter)
+video, text, target = next(data_loader_iter)
 
-print(video.shape)
-# conversation = [
-#     {
-#         "role": "user",
-#         "content": [
-#             {"type": "video"},
-#             {"type": "text", "text": text},
-#         ],
-#     }
-# ]
+print("before handle:", video.shape)
+video = video.squeeze(0)
+print("input:", video.shape)
+
+conversation = [
+    {
+        "role": "user",
+        "content": [
+            {"type": "video"},
+            {"type": "text", "text": text[0]},
+        ],
+    }
+]
+print(conversation)
 
 # Preprocess the inputs
 text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
