@@ -4,37 +4,32 @@ import torch.utils.data as data
 from glob import glob
 import csv
 import random
+import pandas as pd
 
 from torchvision import io
 from typing import Dict
 
 
 def parse_charades_csv(filename):
-    labels = {}
-    with open(filename) as f:
-        reader = csv.DictReader(f)
-        for row in reader:
-            vid = row['id']
-            actions = row['actions']
-            if actions == '':
-                actions = []
-            else:
-                actions = [a.split(' ') for a in actions.split(';')]
-                actions = [{'class': x} for x, y, z in actions]
-            labels[vid] = actions
+    def extract_details(annot):
+        actions = [action_desc.split(' ') for action_desc in str(annot["actions"]).split(';')]
+        actions = [(item[0], float(item[1]), float(item[2])) for item in actions if item[0] != "nan"]
+        descriptions = annot["descriptions"].split(';')
+        objects = annot["objects"].split(';')
+        retval = {annot["id"]: {"actions": actions, "descriptions": descriptions, "scene": annot["scene"], "objects": objects, "length": float(annot["length"])}}
+        return retval
+    df = pd.read_csv(filename)
+    labels = df.apply(lambda annot: extract_details(annot), axis=1)
     return labels
 
 def parse_charades_classes(filename):
     classes = {}
     with open(filename) as f:
         for line in f:
-            # Split on whitespace, assuming first word is class_id
-            parts = line.split(maxsplit=1)
-            if len(parts) == 2:  # Ensure the line has a class_id and description
-                class_id, action = parts
-                classes[class_id] = action.strip()
-            else:
-                print(f"Skipping malformed line: {line}")
+            # Split on whitespace, assuming first word is class_id of length 4
+            if len(line) > 0:
+                classes[line[:4]] = line[5:-1]
+                
     return classes
 
 def fetch_video(ele: Dict, nframe_factor=2):
@@ -82,17 +77,17 @@ def genQ(T_actions, F_actions):
     return Qs, As
 
 class Charades_action(data.Dataset):
-    def __init__(self, root, labelpath, classespath, transform=None, target_transform=None):
-        self.num_classes = 157
+    def __init__(self, videos_path, labels_path, classes_path, transform=None, target_transform=None):
         self.transform = transform
         self.target_transform = target_transform
-        self.labels = parse_charades_csv(labelpath)
-        self.classes = parse_charades_classes(classespath)
-        self.root = root
+        self.labels = parse_charades_csv(labels_path)
+        self.classes = parse_charades_classes(classes_path)
+        self.num_classes = len(self.classes)
+        self.videos_path = videos_path
         
-        self.data = self.prepare(root, self.labels, self.classes)
+        self.data = self.prepare(self.videos_path, self.labels, self.classes)
     
-    def prepare(self, path, labels, classes, has_printed, has_printed1):
+    def prepare(self, video_path, labels, classes):
         datadir = path
         video_paths, correct_actions_list,wrong_actions_list,qa_list,as_list, ids = [], [], [], [], [], []
         for i, (vid, label) in enumerate(labels.items()):

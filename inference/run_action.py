@@ -1,36 +1,29 @@
-
-from PIL import Image
-import requests
+import os
 import torch
-from torchvision import io
-from typing import Dict
-from transformers import Qwen2VLForConditionalGeneration, AutoTokenizer, AutoProcessor
+from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
 
 from torch.utils.data import DataLoader
-
-import sys
-import os
-dataset = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
-sys.path.append(dataset)
 from dataset.charadesaction import Charades_action
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-checkpoint_path = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"  
+checkpoint_path = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
 
 # Load the model in half-precision on the available device(s)
 model = Qwen2VLForConditionalGeneration.from_pretrained(checkpoint_path, device_map="auto", torch_dtype="auto")
 processor = AutoProcessor.from_pretrained(checkpoint_path, max_pixels=202500)
 
 print("Loading model complete")
-charades_dataset = Charades_action(root="/home/atuin/g102ea/g102ea12/dataset/charades/videos/Charades_v1",
-                                labelpath="/home/atuin/g102ea/g102ea12/dataset/charades/anotations/Charades/Charades_v1_test.csv",
-                                classespath="/home/atuin/g102ea/g102ea12/dataset/charades/anotations/Charades/Charades_v1_classes.txt"
+
+ROOT_PATH = "/home/atuin/g102ea/g102ea12/datasets"
+DATASET_PATH = os.path.join(ROOT_PATH, "charades")
+
+charades_dataset = Charades_action(videos_path=os.path.join(DATASET_PATH, "/videos/Charades_v1"),
+                                labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
+                                classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt")
                                 )
-batch_size = 1
-shuffle = True
-num_workers = 0
-data_loader = DataLoader(dataset=charades_dataset, batch_size=batch_size, shuffle=shuffle, num_workers=num_workers)
+
+data_loader = DataLoader(dataset=charades_dataset, batch_size=1, shuffle=True)
 data_loader_iter = iter(data_loader)
 for i in range(3):
     video, question, answer = next(data_loader_iter)
