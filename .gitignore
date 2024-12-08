@@ -9,3 +9,6 @@
 env
 .env
 __pycache__
+lazypatches.egg-info/*
+lazypatches.egg-info
+rough/
