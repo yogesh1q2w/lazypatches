@@ -10,6 +10,7 @@ import json
 from torchvision import io
 from typing import Dict
 from tqdm import tqdm
+from inference.utils.vision_process import fetch_video
 
 
 def parse_video_action_csv(filename):
@@ -48,41 +49,6 @@ def parse_action_id_mapping(filename):
                 action_id_mapping[line[:4]] = line[5:-1]
 
     return action_id_mapping
-
-
-def fetch_video(ele: Dict, nframe_factor=2):
-    if isinstance(ele["video"], str):
-
-        def round_by_factor(number: int, factor: int) -> int:
-            # a rounding function to have appropriate linspace
-            return round(number / factor) * factor
-
-    video = ele["video"]
-    if video.startswith("file://"):
-        video = video[7:]
-
-    video, _, info = io.read_video(
-        video,
-        start_pts=ele.get("video_start", 0.0),
-        end_pts=ele.get("video_end", None),
-        pts_unit="sec",
-        output_format="TCHW",
-    )
-    assert not (
-        "fps" in ele and "nframes" in ele
-    ), "Only accept either `fps` or `nframes`"
-    if "nframes" in ele:
-        # if total frames are specified for processed video
-        nframes = round_by_factor(ele["nframes"], nframe_factor)
-    else:
-        # if target fps is specified for processed video
-        fps = ele.get("fps", 2.0)
-        nframes = round_by_factor(
-            video.size(0) / info["video_fps"] * fps, nframe_factor
-        )
-
-    idx = torch.linspace(0, video.size(0) - 1, nframes, dtype=torch.int64)
-    return video[idx]
 
 
 class CharadesActionMCQ(data.Dataset):
@@ -185,9 +151,9 @@ class CharadesActionMCQ(data.Dataset):
 
         video_info = {"type": "video", "video": path, "fps": self.target_fps}
         video = fetch_video(video_info)
-        quetion = self.data["mcq_data"]["mcqs"][index]
+        question = self.data["mcq_data"]["mcqs"][index]
 
-        return video, quetion, answer
+        return index, video, question, answer
 
     def __len__(self):
         return self.data["n_samples"]

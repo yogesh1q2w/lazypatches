@@ -1,18 +1,21 @@
 import os
 import torch
+import json
 from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
 
 from torch.utils.data import DataLoader
 from dataset.charades_action import CharadesActionMCQ
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+SAVE_EVERY = 100
 
 MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
 
 ROOT_PATH = "/home/atuin/g102ea/g102ea12/dataset"
 DATASET_PATH = os.path.join(ROOT_PATH, "charades")
 
-RELOAD=False
+
+RELOAD=True
 if RELOAD:
     charades_dataset = CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/datasets/charades/charades_mcq.json", reload=RELOAD)
 else:
@@ -32,9 +35,11 @@ processor = AutoProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 print("Loading model complete")
 
 data_loader = DataLoader(dataset=charades_dataset, batch_size=1, shuffle=True)
-data_loader_iter = iter(data_loader)
-for i in range(5):
-    video, question, answer = next(data_loader_iter)
+print("Length of dataset: ", len(charades_dataset))
+results = []
+
+for step, data in enumerate(data_loader):
+    idx, video, question, answer = data
 
     video = video.squeeze(0)
 
@@ -56,5 +61,11 @@ for i in range(5):
     generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
     output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
     print(output_text)
+    print(answer)
+    results.append({"idx": idx, "answer": answer, "output": output_text[0]})
     torch.cuda.empty_cache()
     
+    if step % SAVE_EVERY == 0:
+        json.dump(results, open("results.json", "wb"))
+    
+json.dump(results, open("results.json", "wb"))
