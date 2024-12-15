@@ -1,4 +1,5 @@
 import os
+import sys
 import torch
 import json
 from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
@@ -34,9 +35,10 @@ processor = AutoProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 
 print("Loading model complete")
 
-data_loader = DataLoader(dataset=charades_dataset, batch_size=1, shuffle=True)
+data_loader = DataLoader(dataset=charades_dataset, batch_size=1, shuffle=False)
 print("Length of dataset: ", len(charades_dataset))
 results = []
+failed_indices = []
 
 for step, data in enumerate(data_loader):
     idx, video, question, answer = data
@@ -53,19 +55,26 @@ for step, data in enumerate(data_loader):
         }
     ]
 
-    text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
-    inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt")
-    inputs = inputs.to(DEVICE)
+    try:
+        text_prompt = processor.apply_chat_template(conversation, add_generation_prompt=True)
+        inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt")
+        inputs = inputs.to(DEVICE)
 
-    output_ids = model.generate(**inputs, max_new_tokens=128)
-    generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
-    output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-    print(output_text)
-    print(answer)
-    results.append({"idx": idx, "answer": answer, "output": output_text[0]})
-    torch.cuda.empty_cache()
+        output_ids = model.generate(**inputs, max_new_tokens=128)
+        generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
+        output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+        print(int(idx[0]), output_text[0])
+        print(answer[0])
+        print("-------------------")
+        results.append({"idx": int(idx[0]), "answer": answer[0], "output": output_text[0]})
+        torch.cuda.empty_cache()
+    except:
+        failed_indices.append(int(idx[0]))
     
     if step % SAVE_EVERY == 0:
-        json.dump(results, open("results.json", "wb"))
+        json.dump(results, open("results.json", "w"))
+        json.dump(failed_indices, open("failed_indices.json", "w"))
+        print(f"saved till step {step}", file=sys.stderr)
     
-json.dump(results, open("results.json", "wb"))
+json.dump(results, open("results.json", "w"))
+json.dump(failed_indices, open("failed_indices.json", "w"))
