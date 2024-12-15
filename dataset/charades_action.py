@@ -9,6 +9,7 @@ import json
 
 from torchvision import io
 from typing import Dict
+from tqdm import tqdm
 
 
 def parse_video_action_csv(filename):
@@ -22,20 +23,19 @@ def parse_video_action_csv(filename):
             if item[0] != "nan"
         ]
         descriptions = annot["descriptions"].split(";")
-        objects = annot["objects"].split(";")
+        objects = [] if str(annot["objects"]) == "nan" else annot["objects"].split(";")
         retval = {
-            annot["id"]: {
+                "id": annot["id"],
                 "actions": actions,
                 "descriptions": descriptions,
                 "scene": annot["scene"],
                 "objects": objects,
                 "length": float(annot["length"]),
-            }
         }
         return retval
 
     df = pd.read_csv(filename)
-    labels = df.apply(lambda annot: extract_details(annot), axis=1)
+    labels = list(df.apply(lambda annot: extract_details(annot), axis=1))
     return labels
 
 
@@ -99,7 +99,7 @@ class CharadesActionMCQ(data.Dataset):
         # give either already exisiting dataset or corresponding paths to build one
         if reload:
             assert videos_path is None and labels_path is None and classes_path is None and n_wrong_options is None
-            self.data = json.load(dataset_path)
+            self.data = json.load(open(dataset_path, "r"))
         else:
             assert dataset_path is not None and videos_path is not None and labels_path is not None and classes_path is not None and n_wrong_options is not None
         
@@ -118,13 +118,13 @@ class CharadesActionMCQ(data.Dataset):
                          "mcq_data": mcq_data,
                          "n_samples": len(mcq_data["mcqs"])
                          }
-            json.dump(self.data, dataset_path)
+            json.dump(self.data, open(dataset_path, "w"))
         self.target_fps = target_fps
         
     def prepare(self):
         question_prompt = open(
             os.path.join(
-                os.path.dirname(os.path.abspath(__file__)), "../utils/action_mcq.txt"
+                os.path.dirname(os.path.abspath(__file__)), "utils/action_mcq.txt"
             ),
             "r",
         ).read()
@@ -137,9 +137,9 @@ class CharadesActionMCQ(data.Dataset):
             answers = []
             for true_option_id in true_actions_ids:
                 false_options_ids = np.random.choice(
-                    false_action_ids, size=self.num_wrong_options, replace=False
+                    false_action_ids, size=self.n_wrong_options, replace=False
                 )
-                all_options = [true_option_id] + false_options_ids
+                all_options = np.append([true_option_id], false_options_ids)
                 np.random.shuffle(all_options)
                 question = (
                     question_prompt
@@ -160,13 +160,13 @@ class CharadesActionMCQ(data.Dataset):
         mcqs = []
         mcq_labels = []
 
-        for video_id, annot in self.labels.items():
+        for video_info in tqdm(self.labels):
 
-            video_path = "{}/{}.mp4".format(self.videos_path, video_id)
-            video_questions, video_answers = generate_questions(annot["actions"])
+            video_path = "{}/{}.mp4".format(self.videos_path, video_info["id"])
+            video_questions, video_answers = generate_questions([action[0] for action in video_info["actions"]])
 
             video_paths.extend([video_path] * len(video_answers))
-            video_ids.extend([video_id] * len(video_answers))
+            video_ids.extend([video_info["id"]] * len(video_answers))
             mcqs.extend(video_questions)
             mcq_labels.extend(video_answers)
 
