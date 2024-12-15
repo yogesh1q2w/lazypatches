@@ -14,10 +14,10 @@ DATASET_PATH = os.path.join(ROOT_PATH, "charades")
 
 RELOAD=False
 if RELOAD:
-    charades_dataset = CharadesActionMCQ(dataset_path=os.path.join(DATASET_PATH, "charades_mcq.json"), reload=RELOAD)
+    charades_dataset = CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/datasets/charades/charades_mcq.json", reload=RELOAD)
 else:
-    charades_dataset = CharadesActionMCQ(dataset_path=os.path.join(DATASET_PATH, "charades_mcq.json"),
-                                    videos_path=os.path.join(DATASET_PATH, "/videos/Charades_v1"),
+    charades_dataset = CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/datasets/charades/charades_mcq.json",
+                                    videos_path=os.path.join(DATASET_PATH, "videos/Charades_v1"),
                                     labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
                                     classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
                                     n_wrong_options=4,

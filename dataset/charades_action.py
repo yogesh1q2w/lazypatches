@@ -102,26 +102,22 @@ class CharadesActionMCQ(data.Dataset):
             self.data = json.load(open(dataset_path, "r"))
         else:
             assert dataset_path is not None and videos_path is not None and labels_path is not None and classes_path is not None and n_wrong_options is not None
-        
-            self.labels = parse_video_action_csv(labels_path)
-            self.action_id_mapping = parse_action_id_mapping(classes_path)
-            self.num_action_classes = len(self.action_id_mapping)
-            self.videos_path = videos_path
-            self.n_wrong_options = n_wrong_options
+            labels = parse_video_action_csv(labels_path)
+            action_id_mapping = parse_action_id_mapping(classes_path)
             
-            mcq_data = self.prepare()
+            mcq_data = self.prepare(labels, action_id_mapping, n_wrong_options, videos_path)
 
-            self.data = {"videos_path": self.videos_path,
+            self.data = {"videos_path": videos_path,
                          "labels_path": labels_path,
                          "classes_path": classes_path,
-                         "n_wrong_options": self.n_wrong_options,
+                         "n_wrong_options": n_wrong_options,
                          "mcq_data": mcq_data,
                          "n_samples": len(mcq_data["mcqs"])
                          }
             json.dump(self.data, open(dataset_path, "w"))
         self.target_fps = target_fps
         
-    def prepare(self):
+    def prepare(self, labels, action_id_mapping, n_wrong_options, videos_path):
         question_prompt = open(
             os.path.join(
                 os.path.dirname(os.path.abspath(__file__)), "utils/action_mcq.txt"
@@ -131,13 +127,13 @@ class CharadesActionMCQ(data.Dataset):
 
         def generate_questions(true_actions_ids):
             false_action_ids = list(
-                set(self.action_id_mapping.keys()) - set(true_actions_ids)
+                set(action_id_mapping.keys()) - set(true_actions_ids)
             )
             questions = []
             answers = []
             for true_option_id in true_actions_ids:
                 false_options_ids = np.random.choice(
-                    false_action_ids, size=self.n_wrong_options, replace=False
+                    false_action_ids, size=n_wrong_options, replace=False
                 )
                 all_options = np.append([true_option_id], false_options_ids)
                 np.random.shuffle(all_options)
@@ -146,13 +142,13 @@ class CharadesActionMCQ(data.Dataset):
                     + "\n"
                     + "\n".join(
                         [
-                            f"({i+1}) {self.action_id_mapping[option]}"
+                            f"({i+1}) {action_id_mapping[option]}"
                             for i, option in enumerate(all_options)
                         ]
                     )
                 )
                 questions.append(question)
-                answers.append(self.action_id_mapping[true_option_id])
+                answers.append(action_id_mapping[true_option_id])
             return questions, answers
 
         video_paths = []
@@ -160,9 +156,9 @@ class CharadesActionMCQ(data.Dataset):
         mcqs = []
         mcq_labels = []
 
-        for video_info in tqdm(self.labels):
+        for video_info in tqdm(labels):
 
-            video_path = "{}/{}.mp4".format(self.videos_path, video_info["id"])
+            video_path = f"{videos_path}/{video_info['id']}.mp4"
             video_questions, video_answers = generate_questions([action[0] for action in video_info["actions"]])
 
             video_paths.extend([video_path] * len(video_answers))
@@ -194,4 +190,4 @@ class CharadesActionMCQ(data.Dataset):
         return video, quetion, answer
 
     def __len__(self):
-        return len(self.data["data"]["n_samples"])
+        return self.data["n_samples"]
