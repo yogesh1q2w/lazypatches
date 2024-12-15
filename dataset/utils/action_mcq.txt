@@ -1,0 +1,5 @@
+You will be presented with a video and 5 options, each corresponding to some action.
+Select the option which corresponds to the action that occurs in the video.
+If there are multiple options, select the one which is most appropriate and relevant.
+Let's think step by step.
+Your final answer should be a single option from the set of options provided.
