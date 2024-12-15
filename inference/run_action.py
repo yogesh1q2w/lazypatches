@@ -33,24 +33,27 @@ else:
 model = Qwen2VLForConditionalGeneration.from_pretrained(MODEL_CHECKPOINT_PATH, device_map="auto", torch_dtype="auto")
 processor = AutoProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 
-print("Loading model complete")
+print("Loading model complete", flush=True)
 
 data_loader = DataLoader(dataset=charades_dataset, batch_size=1, shuffle=False)
-print("Length of dataset: ", len(charades_dataset))
+print("Length of dataset: ", len(charades_dataset), flush=True)
 results = []
 failed_indices = []
 
 for step, data in enumerate(data_loader):
     idx, video, question, answer = data
 
+    idx = idx[0]
     video = video.squeeze(0)
+    question = question[0]
+    answer = answer[0]
 
     conversation = [
         {
             "role": "user",
             "content": [
                 {"type": "video"},
-                {"type": "text", "text": question[0]},
+                {"type": "text", "text": question},
             ],
         }
     ]
@@ -63,13 +66,13 @@ for step, data in enumerate(data_loader):
         output_ids = model.generate(**inputs, max_new_tokens=128)
         generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
         output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-        print(int(idx[0]), output_text[0])
-        print(answer[0])
-        print("-------------------")
-        results.append({"idx": int(idx[0]), "answer": answer[0], "output": output_text[0]})
+        print(int(idx), output_text[0], flush=True)
+        print(answer, flush=True)
+        print("-------------------", flush=True)
+        results.append({"idx": int(idx), "answer": answer, "output": output_text[0]})
         torch.cuda.empty_cache()
     except:
-        failed_indices.append(int(idx[0]))
+        failed_indices.append(int(idx))
     
     if step % SAVE_EVERY == 0:
         json.dump(results, open("results.json", "w"))
