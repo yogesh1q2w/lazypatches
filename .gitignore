@@ -8,8 +8,7 @@
 *.out
 env
 .env
-__pycache__
-lazypatches.egg-info/*
-lazypatches.egg-info
+__pycache__/
 rough/
 *.json
+*.egg-info/
