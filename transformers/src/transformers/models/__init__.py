@@ -15,5 +15,6 @@
 from . import (
     qwen2,
     qwen2_vl,
+    qwen2_vl_lazy,
     vit,
 )
