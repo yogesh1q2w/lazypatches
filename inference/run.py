@@ -4,7 +4,7 @@ import requests
 import torch
 from torchvision import io
 from typing import Dict
-from transformers import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
+from transformers.models.qwen2_vl_lazy import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
 from inference.utils.vision_process import fetch_video
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
