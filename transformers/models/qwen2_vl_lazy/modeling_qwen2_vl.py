@@ -50,7 +50,7 @@ from ...utils import (
     replace_return_docstrings,
 )
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
-
+from .vt_samplers import UniformSampler
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -102,6 +102,7 @@ class Qwen2VLCausalLMOutputWithPast(ModelOutput):
     hidden_states: Optional[Tuple[torch.FloatTensor]] = None
     attentions: Optional[Tuple[torch.FloatTensor]] = None
     rope_deltas: Optional[torch.LongTensor] = None
+
 
 
 class Qwen2VLRotaryEmbedding(nn.Module):
@@ -830,6 +831,9 @@ QWEN2_VL_ATTENTION_CLASSES = {
     "sdpa": Qwen2VLSdpaAttention,
 }
 
+QWEN2_VL_SAMPLER_CLASSES = {
+    "random" : UniformSampler,
+}
 
 class Qwen2VLDecoderLayer(nn.Module):
     def __init__(self, config: Qwen2VLConfig, layer_idx: int):
@@ -1063,6 +1067,9 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         self.norm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen2VLRotaryEmbedding(config=config)
 
+        self.sampler = QWEN2_VL_SAMPLER_CLASSES[config.selector_implementation](config)
+        self.selector_iter = config.selector_iter
+
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
         self.post_init()
@@ -1093,9 +1100,10 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         use_cache = use_cache if use_cache is not None else self.config.use_cache
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
-        if (input_ids is None) ^ (inputs_embeds is not None):
-            raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
+        
+        # commented by team-lazy to propagate input ids
+        # if (input_ids is None) ^ (inputs_embeds is not None):
+        #     raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 
         if self.gradient_checkpointing and self.training:
             if use_cache:
@@ -1126,9 +1134,11 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         causal_mask = self._update_causal_mask(
             attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions
         )
-
+        vision_index_start = -1
+        vision_index_end = -1
         hidden_states = inputs_embeds
-
+        
+        
         # create position embeddings to be shared across the decoder layers
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
@@ -1137,7 +1147,11 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = None
 
-        for decoder_layer in self.layers:
+        for idx, decoder_layer in enumerate(self.layers):
+            # if idx % self.selector_iter == 0:
+            #     hidden_states = self.sampler(hidden_states)
+            #     print(f'subsampled tokens at {idx}')
+
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -1166,7 +1180,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                 )
 
             hidden_states = layer_outputs[0]
-
+            
             if use_cache:
                 next_decoder_cache = layer_outputs[2 if output_attentions else 1]
 
@@ -1658,7 +1672,7 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-
+        
         if inputs_embeds is None:
             inputs_embeds = self.model.embed_tokens(input_ids)
             if pixel_values is not None:
@@ -1719,8 +1733,20 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
 
+        # print('--------------hidden-states shape----')
+        # print(inputs_embeds.shape)
+        # print('-------position ids-------')
+        # print(position_ids)
+        # print('-------position ids shape-------')
+        # print(position_ids.shape)
+        # print('---------input ids-----')
+        # print(input_ids)
+        # print('---------input ids shape-----')
+        # print(input_ids.shape)
+        
+
         outputs = self.model(
-            input_ids=None,
+            input_ids=input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
             past_key_values=past_key_values,
