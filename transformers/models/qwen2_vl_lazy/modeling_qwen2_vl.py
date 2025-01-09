@@ -1087,6 +1087,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
+        video_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -1104,7 +1105,10 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         # commented by team-lazy to propagate input ids
         # if (input_ids is None) ^ (inputs_embeds is not None):
         #     raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
-
+        # print('********************************************************************************')
+        # print(f'The number of hidden layers in the model are : {self.config.num_hidden_layers}')
+        # print('********************************************************************************')
+        
         if self.gradient_checkpointing and self.training:
             if use_cache:
                 logger.warning_once(
@@ -1118,6 +1122,14 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
+
+        if video_mask is None or video_mask.any().item(): #in case of img only i/p, video mask shall be none and then it will be false entirely, but for video's successive inputs it won't return complete false tensors
+            video_mask = (
+                    (input_ids == self.config.video_token_id)
+                    .unsqueeze(-1)
+                    .expand_as(inputs_embeds)
+                    .to(inputs_embeds.device)
+                )
 
         if cache_position is None:
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
@@ -1134,10 +1146,9 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         causal_mask = self._update_causal_mask(
             attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions
         )
-        vision_index_start = -1
-        vision_index_end = -1
+        # vision_index_start = -1
+        # vision_index_end = -1
         hidden_states = inputs_embeds
-        
         
         # create position embeddings to be shared across the decoder layers
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
@@ -1148,9 +1159,17 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         next_decoder_cache = None
 
         for idx, decoder_layer in enumerate(self.layers):
-            # if idx % self.selector_iter == 0:
-            #     hidden_states = self.sampler(hidden_states)
-            #     print(f'subsampled tokens at {idx}')
+            if idx % self.selector_iter == 0:
+                if video_mask.any().item():
+                    # print(f"video_mask shape: {video_mask.shape}")
+                    # print(f"Any True values? {video_mask.any().item()}")
+                    # print(f"Number of True values: {video_mask.sum().item()}")
+                    # print(f"Sample values: {video_mask[:2, :10]}")
+                    hidden_states = self.sampler(hidden_states, video_mask)
+                    print(f'subsampled tokens at {idx}')
+                else:
+                    print('Sampler was not employed!! DEBUG!!')
+
 
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
@@ -1186,6 +1205,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
 
             if output_attentions:
                 all_self_attns += (layer_outputs[1],)
+            
 
         hidden_states = self.norm(hidden_states)
 
@@ -1672,7 +1692,8 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
-        
+        video_mask = None
+
         if inputs_embeds is None:
             inputs_embeds = self.model.embed_tokens(input_ids)
             if pixel_values is not None:
@@ -1751,6 +1772,7 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
             attention_mask=attention_mask,
             past_key_values=past_key_values,
             inputs_embeds=inputs_embeds,
+            video_mask = video_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,
