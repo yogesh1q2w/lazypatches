@@ -45,4 +45,4 @@ class UniformSampler(Sampler):
         # Apply the sampling mask to hidden_states directly
         hidden_states = hidden_states * sampling_mask.float()
 
-        return hidden_states
+        return hidden_states, sampling_mask

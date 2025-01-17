@@ -539,6 +539,7 @@ class Qwen2VLAttention(nn.Module):
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
+        sampling_mask: Optional[torch.BoolTensor] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         bsz, q_len, _ = hidden_states.size()
 
@@ -547,8 +548,10 @@ class Qwen2VLAttention(nn.Module):
         value_states = self.v_proj(hidden_states)
 
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
-        key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-        value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        # Apply the sampling mask to key and value states
+        if sampling_mask is not None:
+            key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+            value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
         if position_embeddings is None:
             logger.warning_once(
@@ -563,10 +566,10 @@ class Qwen2VLAttention(nn.Module):
         query_states, key_states = apply_multimodal_rotary_pos_emb(
             query_states, key_states, cos, sin, self.rope_scaling["mrope_section"]
         )
-
-        if past_key_value is not None:
-            cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}  # Specific to RoPE models
-            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+        if use_cache:
+            if past_key_value is not None:
+                cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}  # Specific to RoPE models
+                key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
         # repeat k/v heads if n_kv_heads < n_heads
         key_states = repeat_kv(key_states, self.num_key_value_groups)
@@ -1158,17 +1161,15 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = None
 
+
         for idx, decoder_layer in enumerate(self.layers):
             if idx % self.selector_iter == 0:
-                if video_mask.any().item():
-                    # print(f"video_mask shape: {video_mask.shape}")
-                    # print(f"Any True values? {video_mask.any().item()}")
-                    # print(f"Number of True values: {video_mask.sum().item()}")
-                    # print(f"Sample values: {video_mask[:2, :10]}")
-                    hidden_states = self.sampler(hidden_states, video_mask)
-                    print(f'subsampled tokens at {idx}')
-                else:
-                    print('Sampler was not employed!! DEBUG!!')
+                # Apply the sampler to get the selected tokens and the sampling mask
+                hidden_states, sampling_mask = self.sampler(hidden_states, video_mask)
+                print(f'subsampled tokens at {idx}')
+            else:
+                sampling_mask = None
+                print('Sampler was not employed!! DEBUG!!')
 
 
             if output_hidden_states:
@@ -1196,6 +1197,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                     use_cache=use_cache,
                     cache_position=cache_position,
                     position_embeddings=position_embeddings,
+                    sampling_mask = sampling_mask,
                 )
 
             hidden_states = layer_outputs[0]
