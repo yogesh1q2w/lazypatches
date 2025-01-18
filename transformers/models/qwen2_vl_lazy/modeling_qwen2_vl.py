@@ -856,6 +856,7 @@ class Qwen2VLDecoderLayer(nn.Module):
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
+        sampling_mask: Optional[torch.Tensor] = None,
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
@@ -1105,9 +1106,9 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         # commented by team-lazy to propagate input ids
         # if (input_ids is None) ^ (inputs_embeds is not None):
         #     raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
-        # print('********************************************************************************')
-        # print(f'The number of hidden layers in the model are : {self.config.num_hidden_layers}')
-        # print('********************************************************************************')
+        print('********************************************************************************')
+        print(f'The number of hidden layers in the model are : {self.config.num_hidden_layers}')
+        print('********************************************************************************')
         
         if self.gradient_checkpointing and self.training:
             if use_cache:
@@ -1123,13 +1124,14 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
 
-        if video_mask is None or video_mask.any().item(): #in case of img only i/p, video mask shall be none and then it will be false entirely, but for video's successive inputs it won't return complete false tensors
+        if video_mask is None or not video_mask.any().item(): #in case of img only i/p, video mask shall be none and then it will be false entirely, but for video's successive inputs it won't return complete false tensors
             video_mask = (
                     (input_ids == self.config.video_token_id)
                     .unsqueeze(-1)
                     .expand_as(inputs_embeds)
                     .to(inputs_embeds.device)
                 )
+            print(f'Video mask is none :{video_mask is None}; Video mask is filled with only false values : {not video_mask.any().item()}')
 
         if cache_position is None:
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
@@ -1149,7 +1151,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         # vision_index_start = -1
         # vision_index_end = -1
         hidden_states = inputs_embeds
-        
+        sampling_mask = None
         # create position embeddings to be shared across the decoder layers
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
@@ -1161,14 +1163,10 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             if idx % self.selector_iter == 0:
                 if video_mask.any().item():
-                    # print(f"video_mask shape: {video_mask.shape}")
-                    # print(f"Any True values? {video_mask.any().item()}")
-                    # print(f"Number of True values: {video_mask.sum().item()}")
-                    # print(f"Sample values: {video_mask[:2, :10]}")
-                    hidden_states = self.sampler(hidden_states, video_mask)
+                    hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask)
                     print(f'subsampled tokens at {idx}')
                 else:
-                    print('Sampler was not employed!! DEBUG!!')
+                    print('Sampler was not employed!')
 
 
             if output_hidden_states:
@@ -1191,6 +1189,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                     hidden_states,
                     attention_mask=causal_mask,
                     position_ids=position_ids,
+                    sampling_mask=sampling_mask,
                     past_key_value=past_key_values,
                     output_attentions=output_attentions,
                     use_cache=use_cache,

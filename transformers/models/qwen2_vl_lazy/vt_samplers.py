@@ -44,5 +44,6 @@ class UniformSampler(Sampler):
 
         # Apply the sampling mask to hidden_states directly
         hidden_states = hidden_states * sampling_mask.float()
+        video_mask = video_mask & sampling_mask
 
-        return hidden_states
+        return hidden_states, video_mask, sampling_mask
