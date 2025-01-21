@@ -1199,7 +1199,6 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                     use_cache=use_cache,
                     cache_position=cache_position,
                     position_embeddings=position_embeddings,
-                    sampling_mask = sampling_mask,
                 )
 
             hidden_states = layer_outputs[0]
