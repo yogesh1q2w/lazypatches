@@ -548,10 +548,14 @@ class Qwen2VLAttention(nn.Module):
         value_states = self.v_proj(hidden_states)
 
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
+        key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+        value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
         # Apply the sampling mask to key and value states
         if sampling_mask is not None:
-            key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
-            value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(-1)  # (bsz, 1, seq_len, 1)
+            key_states = key_states * sampling_mask_expanded
+            value_states = value_states * sampling_mask_expanded
 
         if position_embeddings is None:
             logger.warning_once(
@@ -580,6 +584,11 @@ class Qwen2VLAttention(nn.Module):
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
             attn_weights = attn_weights + causal_mask
+
+        # Apply sampling mask to attention weights
+        if sampling_mask is not None:
+            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(2)  # (bsz, 1, 1, seq_len)
+            attn_weights = attn_weights * sampling_mask_expanded
 
         # Fix precision issues in Qwen2-VL float16 inference
         # Replace inf values with zeros in attention weights to prevent NaN propagation
@@ -635,6 +644,7 @@ class Qwen2VLFlashAttention2(Qwen2VLAttention):
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
+        sampling_mask: Optional[torch.BoolTensor] = None,
     ):
         bsz, q_len, _ = hidden_states.size()
 
@@ -645,6 +655,17 @@ class Qwen2VLFlashAttention2(Qwen2VLAttention):
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+        # Apply the sampling mask to key and value states
+        if sampling_mask is not None:
+            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(-1)  # (bsz, 1, seq_len, 1)
+            key_states = key_states * sampling_mask_expanded
+            value_states = value_states * sampling_mask_expanded
+
+        if attention_mask is not None and sampling_mask is not None:
+            # Ensure the attention mask is compatible with the sampling mask
+            # Sampling mask is of shape (bsz, seq_len), attention mask is typically (bsz, 1, seq_len, seq_len)
+            attention_mask = attention_mask * sampling_mask.unsqueeze(2).unsqueeze(3)  # Mask out sampled tokens
 
         # Because the input can be padded, the absolute sequence length depends on the max position id.
         if position_embeddings is None:
@@ -747,6 +768,7 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
+        sampling_mask: Optional[torch.BoolTensor] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         if output_attentions:
             # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
@@ -774,6 +796,23 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
+        # Apply the sampling mask to key and value states
+        if sampling_mask is not None:
+            # Ensure sampling_mask has shape [bsz, seq_len] -> [1, 1691]
+            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(-1)  # Shape: [1, 1, 1691, 1]
+
+            sampling_mask_expanded = sampling_mask_expanded[:, :, :key_states.shape[2], :]  # Truncate or slice as needed
+
+            # Now expand along the heads dimension to [1, 4, 1691, 1]
+            sampling_mask_expanded = sampling_mask_expanded.expand(-1, 4, -1, 1)  # Shape: [1, 4, 1691, 1]
+            print(f'The size of key_states is {key_states.shape}')
+            print(f'The size of value_states is {value_states.shape}')
+            print(f'The size of sampling mask expanded is {sampling_mask_expanded.shape}')
+            print(f'The size of sampling mask is {sampling_mask.shape}')
+            # Apply the mask to the key_states and value_states
+            key_states = key_states * sampling_mask_expanded  # Broadcasting happens here
+            value_states = value_states * sampling_mask_expanded
+        
         if position_embeddings is None:
             logger.warning_once(
                 "The attention layers in this model are transitioning from computing the RoPE embeddings internally "
@@ -798,6 +837,11 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         causal_mask = attention_mask
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+
+        # Apply sampling mask to attention weights
+        if sampling_mask is not None:
+            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(2)  # (bsz, 1, 1, seq_len)
+            attn_weights = attn_weights * sampling_mask_expanded
 
         # SDPA with memory-efficient backend is currently (torch==2.1.2) bugged with non-contiguous inputs with custom attn_mask,
         # Reference: https://github.com/pytorch/pytorch/issues/112577.
@@ -903,6 +947,7 @@ class Qwen2VLDecoderLayer(nn.Module):
             use_cache=use_cache,
             cache_position=cache_position,
             position_embeddings=position_embeddings,
+            sampling_mask = sampling_mask
         )
         hidden_states = residual + hidden_states
 
