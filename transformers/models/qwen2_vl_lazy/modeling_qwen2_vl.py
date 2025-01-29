@@ -787,7 +787,7 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
             )
 
         bsz, q_len, _ = hidden_states.size()
-
+        import pdb;
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
@@ -798,21 +798,20 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
 
         # Apply the sampling mask to key and value states
         if sampling_mask is not None:
-            # Ensure sampling_mask has shape [bsz, seq_len] -> [1, 1691]
-            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(-1)  # Shape: [1, 1, 1691, 1]
-
-            sampling_mask_expanded = sampling_mask_expanded[:, :, :key_states.shape[2], :]  # Truncate or slice as needed
-
-            # Now expand along the heads dimension to [1, 4, 1691, 1]
-            sampling_mask_expanded = sampling_mask_expanded.expand(-1, 4, -1, 1)  # Shape: [1, 4, 1691, 1]
-            print(f'The size of key_states is {key_states.shape}')
-            print(f'The size of value_states is {value_states.shape}')
-            print(f'The size of sampling mask expanded is {sampling_mask_expanded.shape}')
-            print(f'The size of sampling mask is {sampling_mask.shape}')
-            # Apply the mask to the key_states and value_states
-            key_states = key_states * sampling_mask_expanded  # Broadcasting happens here
-            value_states = value_states * sampling_mask_expanded
-        
+            # divide embeddding space into number of heads  -> since key states embedding is divided by num_heads, we need to divide the mask into similar way as well 
+            bsz, seq_len, embed_dim = sampling_mask.shape
+            assert embed_dim % self.num_heads == 0, "Embedding dimension must be divisible by the number of heads"
+            head_dim = embed_dim // self.num_heads  # Calculate head_dim
+            
+            # Reshape sampling_mask to split embed_dim into num_key_value_heads per num_key_value_groups and head_dim (due to Grouped Query Attention mechanism https://arxiv.org/pdf/2305.13245)
+            sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads, self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
+            #for masking key value states, taking average across groups and thresholding the average float to get boolean mask
+            sampling_mask_mean = torch.mean(sampling_mask.float(), dim=2)  # [bsz, num_heads, seq_len, head_dim]
+            sampling_mask_mean = sampling_mask_mean >= 0.5
+            # Apply the sampling mask to key_states and value_states
+            key_states = key_states * sampling_mask_mean  
+            value_states = value_states * sampling_mask_mean
+            
         if position_embeddings is None:
             logger.warning_once(
                 "The attention layers in this model are transitioning from computing the RoPE embeddings internally "
@@ -838,11 +837,6 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
 
-        # Apply sampling mask to attention weights
-        if sampling_mask is not None:
-            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(2)  # (bsz, 1, 1, seq_len)
-            attn_weights = attn_weights * sampling_mask_expanded
-
         # SDPA with memory-efficient backend is currently (torch==2.1.2) bugged with non-contiguous inputs with custom attn_mask,
         # Reference: https://github.com/pytorch/pytorch/issues/112577.
         if query_states.device.type == "cuda" and attention_mask is not None:
@@ -863,6 +857,12 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
             dropout_p=self.attention_dropout if self.training else 0.0,
             is_causal=is_causal,
         )
+
+        # Apply sampling mask to attention weights
+        if sampling_mask is not None:
+            #reshaping sampling_mask to [bsz, num_heads, seq_len, embed_dim]
+            sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads * self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
+            attn_output = attn_output * sampling_mask
 
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.view(bsz, q_len, self.hidden_size)
@@ -1213,10 +1213,11 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
             if idx % self.selector_iter == 0:
                 if video_mask.any().item():
                     hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask)
-                    print(f'subsampled tokens at {idx}')
+                    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
                 else:
-                    print('Sampler was not employed!')
-
+                    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Video Mask at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+            # else:
+            #     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Sampling at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
 
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
