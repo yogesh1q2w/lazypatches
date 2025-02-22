@@ -203,8 +203,11 @@ class Qwen2VLConfig(PretrainedConfig):
         vt_sampling_strategy=None,
         vt_sampling_proportion: List[float]=None,
         selector_iter = None,
-        selector_implementation = "random",
-        retain_proportion = 0.99,
+        selector_implementation = "spatial",
+        retain_proportion = 0.50,
+        drop_start = 0.10,
+        drop_end = 0.10,
+        periphery_ratio = 0.10,
         **kwargs,
     ):
         if isinstance(vision_config, dict):
@@ -240,6 +243,9 @@ class Qwen2VLConfig(PretrainedConfig):
         self.selector_iter = self.num_hidden_layers//4 if selector_iter is None else selector_iter
         self.selector_implementation = selector_implementation
         self.retain_proportion = retain_proportion
+        self.drop_start = drop_start 
+        self.drop_end = drop_end
+        self.periphery_ratio = periphery_ratio
 
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, move it to 'rope_type'.

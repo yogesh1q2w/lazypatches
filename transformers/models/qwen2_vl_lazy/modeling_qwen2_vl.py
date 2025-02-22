@@ -50,7 +50,7 @@ from ...utils import (
     replace_return_docstrings,
 )
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
-from .vt_samplers import UniformSampler
+from .vt_samplers import UniformSampler, TemporalHeuristicSampler, SpatialHeuristicSampler
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -880,6 +880,8 @@ QWEN2_VL_ATTENTION_CLASSES = {
 
 QWEN2_VL_SAMPLER_CLASSES = {
     "random" : UniformSampler,
+    "temporal" : TemporalHeuristicSampler,
+    "spatial" : SpatialHeuristicSampler,
 }
 
 class Qwen2VLDecoderLayer(nn.Module):
@@ -1212,7 +1214,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             if idx % self.selector_iter == 0:
                 if video_mask.any().item():
-                    hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask)
+                    hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids)
                     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
                 else:
                     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Video Mask at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
@@ -1653,6 +1655,10 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                 position_ids[..., i, attention_mask[i] == 1] = llm_positions.to(position_ids.device)
                 mrope_position_deltas.append(llm_positions.max() + 1 - len(total_input_ids[i]))
             mrope_position_deltas = torch.tensor(mrope_position_deltas, device=input_ids.device).unsqueeze(1)
+            # print(f'The positional ids for the input video is {position_ids}. ')
+            # print(f'the shape of the posiitonal ids are : {position_ids.shape}')
+            # print(f'The mrope delta is {mrope_position_deltas}')
+            # print(f'the shape of mrope position deltas is {mrope_position_deltas.shape}')
             return position_ids, mrope_position_deltas
         else:
             if attention_mask is not None:
@@ -1672,7 +1678,10 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                     device=input_ids.device,
                     dtype=input_ids.dtype,
                 )
-
+            print(f'The positional ids for the input video is {position_ids}. ')
+            print(f'the shape of the posiitonal ids are : {position_ids.shape()}')
+            print(f'The mrope delta is {mrope_position_deltas}')
+            print(f'the shape of mrope position deltas is {mrope_position_deltas.shape()}')
             return position_ids, mrope_position_deltas
 
     @add_start_docstrings_to_model_forward(QWEN2_VL_INPUTS_DOCSTRING)
@@ -1802,18 +1811,6 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                     delta = delta.repeat_interleave(batch_size // delta.shape[0], dim=0)
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
-
-        # print('--------------hidden-states shape----')
-        # print(inputs_embeds.shape)
-        # print('-------position ids-------')
-        # print(position_ids)
-        # print('-------position ids shape-------')
-        # print(position_ids.shape)
-        # print('---------input ids-----')
-        # print(input_ids)
-        # print('---------input ids shape-----')
-        # print(input_ids.shape)
-        
 
         outputs = self.model(
             input_ids=input_ids,
