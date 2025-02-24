@@ -41,6 +41,7 @@ def extract_subset_data(filename, sampled_data):
     df = pd.read_csv(filename)
 
     subset_data = {}
+    num = 0
     for _, row in df.iterrows():
         video_id = row["id"]
         for action, info in sampled_data.items():
@@ -54,15 +55,20 @@ def extract_subset_data(filename, sampled_data):
                         "objects": [] if str(row["objects"]) == "nan" else row["objects"].split(";"),
                         "length": float(row["length"]),
                     }
-                actions = [
+
+                raw_actions = [
                     action_desc.split(" ")
                     for action_desc in str(row["actions"]).split(";")
                 ]
-                actions = [
-                    (item[0], float(item[1]), float(item[2]))
-                    for item in actions
-                    if item[0] == action  # Only keep the specific action
-                ]
+
+                seen = set()  # record existed action_id
+                actions = []
+                for item in raw_actions:
+                    action_id = item[0]
+                    if action_id == action and action_id not in seen:
+                        actions.append((action_id, float(item[1]), float(item[2])))
+                        seen.add(action_id) 
+
                 if actions:
                     subset_data[video_id]["actions"].extend(actions)
 
@@ -99,6 +105,7 @@ class Sub_CharadesActionMCQ(data.Dataset):
             assert dataset_path is not None and videos_path is not None and labels_path is not None and classes_path is not None and n_wrong_options is not None
             with open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils/subset_charades.json"), "r") as f:
                 subset_data = json.load(f)
+            
             subset_labels = extract_subset_data(labels_path, subset_data)
             labels = parse_video_action_csv(labels_path)
             action_id_mapping = parse_action_id_mapping(classes_path)
