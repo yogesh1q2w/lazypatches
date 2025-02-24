@@ -167,13 +167,13 @@ class Sub_CharadesActionMCQ(data.Dataset):
             video_id = subset_video_info["id"]
 
             if video_id in labels_dict:  # ensure video_id also in labels
-                video_info = labels_dict[video_id]  # 获取对应的 labels 数据
+                video_info = labels_dict[video_id]  # get corresponding video_id
                 video_path = f"{videos_path}/{video_id}.mp4"
 
                 # 生成 MCQs，仅使用 subset_labels 里的动作
                 video_questions, video_answers = generate_questions(
-                    [action[0] for action in video_info["actions"]],  # labels 里的所有动作
-                    [action[0] for action in subset_video_info["actions"]]  # subset_labels 里的动作
+                    [action[0] for action in video_info["actions"]],  # all true actions in video
+                    [action[0] for action in subset_video_info["actions"]]  # subset true actions in video
                 )
                 
             video_paths.extend([video_path] * len(video_answers))
