@@ -4,14 +4,14 @@ import torch
 import json
 import logging
 import time
-from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+from transformers import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
 
 from torch.utils.data import DataLoader
 from dataset.charades_action import CharadesActionMCQ
 from dataset.sub_charades_action import Sub_CharadesActionMCQ
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-SAVE_EVERY = 5
+SAVE_EVERY = 10
 
 MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
 
@@ -43,13 +43,13 @@ else:
 
 # Load the model in half-precision on the available device(s)
 model = Qwen2VLForConditionalGeneration.from_pretrained(MODEL_CHECKPOINT_PATH, device_map="auto", torch_dtype="auto")
-processor = AutoProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
+processor = Qwen2VLProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 
 print("Loading model complete", flush=True)
 
 def normalize_text(text):
     """Normalize text for comparison"""
-    return text.strip().lower()
+    return text.strip().lower() if isinstance(text, str) else ""
 
 data_loader = DataLoader(dataset=charades_dataset, batch_size=1, shuffle=False)
 print("Length of dataset: ", len(charades_dataset), flush=True)
@@ -57,7 +57,7 @@ results = []
 failed_indices = []
 
 for step, data in enumerate(data_loader):
-    if step >= 5:
+    if step >= 100:
         break
     start_time = time.time()  # <-- Start timer
     
@@ -94,7 +94,7 @@ for step, data in enumerate(data_loader):
         print("-------------------", flush=True)
 
         # Evaluate correctness
-        pred = normalize_text(output_text)
+        pred = normalize_text(output_text[0]) if isinstance(output_text, list) and output_text else ""
         gt = normalize_text(answer)
         is_correct = any([
             gt in pred,       # Check if answer is substring of prediction
@@ -112,29 +112,13 @@ for step, data in enumerate(data_loader):
             "processing_time": elapsed_time  # <-- Store processing time
         })
         torch.cuda.empty_cache()
-    # except:
-    #     failed_indices.append(int(idx))
-    #     torch.cuda.empty_cache()
-    except KeyError as e:
-        logger.error(f"KeyError at index {idx}: {e}", exc_info=True)
+    except:
         failed_indices.append(int(idx))
-
-    except ValueError as e:
-        logger.error(f"ValueError at index {idx}: {e}", exc_info=True)
-        failed_indices.append(int(idx))
-
-    except RuntimeError as e:
-        logger.error(f"RuntimeError (Possible CUDA issue) at index {idx}: {e}", exc_info=True)
-        failed_indices.append(int(idx))
-
-    except Exception as e:  # Catch-all for unexpected errors
-        logger.error(f"Unexpected error at index {idx}: {e}", exc_info=True)
-        failed_indices.append(int(idx))
-    finally:
-        torch.cuda.empty_cache()    
+        torch.cuda.empty_cache()
     
-    # if step % 10 == 0:
-            # logger.info(f"Processed {step}/{len(charades_dataset)} - Current ACC: {sum(r['is_correct'] for r in results)/len(results):.2f}")
+    if step % 10 == 0:
+        current_accuracy = sum(r["is_correct"] for r in results) / len(results) if len(results) > 0 else 0
+        logger.info(f"Processed {step}/{len(charades_dataset)} - Current ACC: {current_accuracy:.4f}")
 
     if step % SAVE_EVERY == 0:
         json.dump(results, open("results.json", "w"))
@@ -148,11 +132,13 @@ json.dump(failed_indices, open("failed_indices.json", "w"))
 
 # Calculate final metrics
 correct = sum(r["is_correct"] for r in results)
-total = len(results)
+total = len(results)  # Only successful samples
+total_attempts = total + len(failed_indices)  # Include failed attempts
 accuracy = correct / total if total > 0 else 0
+error_rate = len(failed_indices) / total_attempts if total_attempts > 0 else 0
 
 logger.info("\nFinal Evaluation Results:")
-logger.info(f"Processed Samples: {total}")
+logger.info(f"Processed Samples: {total_attempts}")
 logger.info(f"Failed Samples: {len(failed_indices)}")
 logger.info(f"Accuracy: {accuracy:.4f} ({correct}/{total})")
-logger.info(f"Error Rate: {len(failed_indices)/len(charades_dataset):.4f}")
+logger.info(f"Error Rate: {error_rate:.4f}")
