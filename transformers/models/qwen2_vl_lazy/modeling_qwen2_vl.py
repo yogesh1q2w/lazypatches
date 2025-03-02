@@ -796,21 +796,21 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
-        # Apply the sampling mask to key and value states
-        if sampling_mask is not None:
-            # divide embeddding space into number of heads  -> since key states embedding is divided by num_heads, we need to divide the mask into similar way as well 
-            bsz, seq_len, embed_dim = sampling_mask.shape
-            assert embed_dim % self.num_heads == 0, "Embedding dimension must be divisible by the number of heads"
-            head_dim = embed_dim // self.num_heads  # Calculate head_dim
+        # # Apply the sampling mask to key and value states
+        # if sampling_mask is not None:
+        #     # divide embeddding space into number of heads  -> since key states embedding is divided by num_heads, we need to divide the mask into similar way as well 
+        #     bsz, seq_len, embed_dim = sampling_mask.shape
+        #     assert embed_dim % self.num_heads == 0, "Embedding dimension must be divisible by the number of heads"
+        #     head_dim = embed_dim // self.num_heads  # Calculate head_dim
             
-            # Reshape sampling_mask to split embed_dim into num_key_value_heads per num_key_value_groups and head_dim (due to Grouped Query Attention mechanism https://arxiv.org/pdf/2305.13245)
-            sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads, self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
-            #for masking key value states, taking average across groups and thresholding the average float to get boolean mask
-            sampling_mask_mean = torch.mean(sampling_mask.float(), dim=2)  # [bsz, num_heads, seq_len, head_dim]
-            sampling_mask_mean = sampling_mask_mean >= 0.5
-            # Apply the sampling mask to key_states and value_states
-            key_states = key_states * sampling_mask_mean  
-            value_states = value_states * sampling_mask_mean
+        #     # Reshape sampling_mask to split embed_dim into num_key_value_heads per num_key_value_groups and head_dim (due to Grouped Query Attention mechanism https://arxiv.org/pdf/2305.13245)
+        #     sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads, self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
+        #     #for masking key value states, taking average across groups and thresholding the average float to get boolean mask
+        #     sampling_mask_mean = torch.mean(sampling_mask.float(), dim=2)  # [bsz, num_heads, seq_len, head_dim]
+        #     sampling_mask_mean = sampling_mask_mean >= 0.5
+        #     # Apply the sampling mask to key_states and value_states
+        #     key_states = key_states * sampling_mask_mean  
+        #     value_states = value_states * sampling_mask_mean
             
         if position_embeddings is None:
             logger.warning_once(
@@ -858,11 +858,11 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
             is_causal=is_causal,
         )
 
-        # Apply sampling mask to attention weights
-        if sampling_mask is not None:
-            #reshaping sampling_mask to [bsz, num_heads, seq_len, embed_dim]
-            sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads * self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
-            attn_output = attn_output * sampling_mask
+        # # Apply sampling mask to attention weights
+        # if sampling_mask is not None:
+        #     #reshaping sampling_mask to [bsz, num_heads, seq_len, embed_dim]
+        #     sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads * self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
+        #     attn_output = attn_output * sampling_mask
 
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.view(bsz, q_len, self.hidden_size)
@@ -1156,9 +1156,6 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         # commented by team-lazy to propagate input ids
         # if (input_ids is None) ^ (inputs_embeds is not None):
         #     raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
-        print('********************************************************************************')
-        print(f'The number of hidden layers in the model are : {self.config.num_hidden_layers}')
-        print('********************************************************************************')
         
         if self.gradient_checkpointing and self.training:
             if use_cache:
@@ -1181,7 +1178,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                     .expand_as(inputs_embeds)
                     .to(inputs_embeds.device)
                 )
-            print(f'Video mask is none :{video_mask is None}; Video mask is filled with only false values : {not video_mask.any().item()}')
+        #     print(f'Video mask is none :{video_mask is None}; Video mask is filled with only false values : {not video_mask.any().item()}')
 
         if cache_position is None:
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
@@ -1215,12 +1212,12 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
             if idx % self.selector_iter == 0:
                 if video_mask.any().item():
                     hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids)
-                    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+                    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+                    # import pdb; pdb.set_trace()
                 else:
-                    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Video Mask at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-            # else:
-            #     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Sampling at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-
+                    pass
+                    # print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Video Mask at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
+            
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 

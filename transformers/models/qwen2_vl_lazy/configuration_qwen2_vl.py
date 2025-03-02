@@ -203,10 +203,10 @@ class Qwen2VLConfig(PretrainedConfig):
         vt_sampling_strategy=None,
         vt_sampling_proportion: List[float]=None,
         selector_iter = None,
-        selector_implementation = "spatial",
-        retain_proportion = 0.50,
-        drop_start = 0.10,
-        drop_end = 0.10,
+        selector_implementation = "random",
+        retain_proportion = 0.60,
+        drop_start = 0.25,
+        drop_end = 0.25,
         periphery_ratio = 0.10,
         **kwargs,
     ):
@@ -240,7 +240,7 @@ class Qwen2VLConfig(PretrainedConfig):
         self.vt_sampling_strategy = vt_sampling_strategy
         self.vt_sampling_proportion = vt_sampling_proportion
 
-        self.selector_iter = self.num_hidden_layers//4 if selector_iter is None else selector_iter
+        self.selector_iter = self.num_hidden_layers if selector_iter is None else selector_iter
         self.selector_implementation = selector_implementation
         self.retain_proportion = retain_proportion
         self.drop_start = drop_start 
