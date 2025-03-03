@@ -18,11 +18,24 @@ MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qw
 ROOT_PATH = "/home/atuin/g102ea/g102ea12/dataset"
 DATASET_PATH = os.path.join(ROOT_PATH, "charades")
 
+FPS = 1.0
+RETENTION_RATE = 1.0
+SAMPLER_TYPE = None
+
+if len(sys.argv) > 1:
+    FPS = float(sys.argv[1])
+if len(sys.argv) > 2:
+    RETENTION_RATE = float(sys.argv[2])
+if len(sys.argv) > 3:
+    SAMPLER_TYPE = sys.argv[3]
+
+TARGET_PATH = f"{SAMPLER_TYPE}@{int(100-RETENTION_RATE*100)}%_{FPS}FPS"
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("evaluation.log"),  # Log to a file
+        logging.FileHandler(os.path.join(TARGET_PATH, "evaluation.log")),  # Log to a file
         logging.StreamHandler(sys.stdout),      # Log to console
     ]
 )
@@ -58,8 +71,8 @@ results = []
 failed_indices = []
 
 for step, data in enumerate(data_loader):
-    # if step >= 20:
-    #     break
+    if step >= 10:
+        break
     start_time = time.time()  # <-- Start timer
     
     idx, video, question, answer = data
@@ -122,13 +135,13 @@ for step, data in enumerate(data_loader):
         logger.info(f"Processed {step}/{len(charades_dataset)} - Current ACC: {current_accuracy:.4f}")
 
     if step % SAVE_EVERY == 0:
-        json.dump(results, open("results.json", "w"))
-        json.dump(failed_indices, open("failed_indices.json", "w"))
+        json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
+        json.dump(failed_indices, open(os.path.join(TARGET_PATH,"failed_indices.json"), "w"))
         print(f"saved till step {step}", file=sys.stderr)
     torch.cuda.empty_cache()
     
-json.dump(results, open("results.json", "w"))
-json.dump(failed_indices, open("failed_indices.json", "w"))
+json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
+json.dump(failed_indices, open(os.path.join(TARGET_PATH,"failed_indices.json"), "w"))
 
 
 # Calculate final metrics

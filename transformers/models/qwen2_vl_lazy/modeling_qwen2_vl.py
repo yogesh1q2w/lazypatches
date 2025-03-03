@@ -20,6 +20,7 @@
 """PyTorch Qwen2-VL model."""
 
 import math
+import sys
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
@@ -63,6 +64,9 @@ else:
 logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "Qwen2VLConfig"
+
+RETENTION_RATE = float(sys.argv[2])
+SAMPLER_TYPE = sys.argv[3]
 
 
 @dataclass
@@ -491,7 +495,7 @@ class Qwen2VLAttention(nn.Module):
     and "Generating Long Sequences with Sparse Transformers".
     """
 
-    def __init__(self, config: Qwen2VLConfig, layer_idx: Optional[int] = None):
+    def __init__(self, config: Qwen2VLConfig(selector_implementation =  SAMPLER_TYPE, retain_proportion = RETENTION_RATE ), layer_idx: Optional[int] = None):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
@@ -885,7 +889,7 @@ QWEN2_VL_SAMPLER_CLASSES = {
 }
 
 class Qwen2VLDecoderLayer(nn.Module):
-    def __init__(self, config: Qwen2VLConfig, layer_idx: int):
+    def __init__(self, config: Qwen2VLConfig(selector_implementation =  SAMPLER_TYPE, retain_proportion = RETENTION_RATE ), layer_idx: int):
         super().__init__()
         self.hidden_size = config.hidden_size
 
@@ -992,7 +996,7 @@ QWEN2VL_START_DOCSTRING = r"""
     QWEN2VL_START_DOCSTRING,
 )
 class Qwen2VLPreTrainedModel(PreTrainedModel):
-    config_class = Qwen2VLConfig
+    config_class = Qwen2VLConfig(selector_implementation =  SAMPLER_TYPE, retain_proportion = RETENTION_RATE )
     base_model_prefix = "model"
     supports_gradient_checkpointing = True
     _no_split_modules = ["Qwen2VLDecoderLayer", "Qwen2VLVisionBlock"]
@@ -1105,7 +1109,7 @@ class Qwen2VisionTransformerPretrainedModel(Qwen2VLPreTrainedModel):
     QWEN2VL_START_DOCSTRING,
 )
 class Qwen2VLModel(Qwen2VLPreTrainedModel):
-    def __init__(self, config: Qwen2VLConfig):
+    def __init__(self, config: Qwen2VLConfig(selector_implementation =  SAMPLER_TYPE, retain_proportion = RETENTION_RATE)):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -1209,7 +1213,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
 
 
         for idx, decoder_layer in enumerate(self.layers):
-            if idx % self.selector_iter == 0:
+            if idx % self.selector_iter == 0 and SAMPLER_TYPE is not None:
                 if video_mask.any().item():
                     hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids)
                     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -1358,7 +1362,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         device: torch.device,
         cache_position: torch.Tensor,
         batch_size: int,
-        config: Qwen2VLConfig,
+        config: Qwen2VLConfig(selector_implementation = SAMPLER_TYPE, retain_proportion = RETENTION_RATE),
         past_key_values: Cache,
     ):
         """

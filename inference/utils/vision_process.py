@@ -30,10 +30,9 @@ VIDEO_MIN_PIXELS = 128 * 28 * 28
 VIDEO_MAX_PIXELS = 225 * 28 * 28
 VIDEO_TOTAL_PIXELS = 225 * 28 * 28
 FRAME_FACTOR = 2
-FPS = 1.6
+FPS = float(sys.argv[1])
 FPS_MIN_FRAMES = 4
 FPS_MAX_FRAMES = 60
-
 
 def round_by_factor(number: int, factor: int) -> int:
     """Returns the closest integer to 'number' that is divisible by 'factor'."""
