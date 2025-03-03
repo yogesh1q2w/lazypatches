@@ -10,4 +10,10 @@ module add python
 conda activate m3project
 source .env/bin/activate
 
-python3 inference/run_sub_action.py > output@40.out
+drop_percent=$((100 - $(echo "$2 * 100" | bc | awk '{print int($1)}')))
+
+output_dir="${3}@${drop_percent}%_${1}FPS"
+
+mkdir -p "$output_dir"
+
+python3 inference/run_sub_action.py "$1" "$2" "$3" > "$output_dir/output.out"

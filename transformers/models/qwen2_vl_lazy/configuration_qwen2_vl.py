@@ -14,7 +14,7 @@
 # limitations under the License.
 """Qwen2VL model configuration"""
 from typing import List
-
+import sys
 from ...configuration_utils import PretrainedConfig
 from ...modeling_rope_utils import rope_config_validation
 from ...utils import logging
@@ -203,8 +203,8 @@ class Qwen2VLConfig(PretrainedConfig):
         vt_sampling_strategy=None,
         vt_sampling_proportion: List[float]=None,
         selector_iter = None,
-        selector_implementation = "st_gaussian",
-        retain_proportion = 0.5,
+        selector_implementation = sys.argv[3],
+        retain_proportion = sys.argv[2],
         temporal_variance = 1,
         spatial_variance = 1,
         **kwargs,
