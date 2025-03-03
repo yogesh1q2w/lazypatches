@@ -103,73 +103,48 @@ class UniformSampler(Sampler):
 
         # return updated_hidden_states, video_mask, sampling_mask
 
-class TemporalHeuristicSampler(Sampler):
+class SpatioTemporalHeuristicSampler(Sampler):
     def __init__(self, config):
-        super().__init__("temporal_heuristic")
+        super().__init__("st_gaussian")
         self.retain_proportion = config.retain_proportion
-        self.drop_start = config.drop_start  # Proportion of early frames to drop
-        self.drop_end = config.drop_end  # Proportion of late frames to drop
+        self.temporal_variance = config.temporal_variance
+        self.spatial_variance = config.spatial_variance
     
     def sample(self, hidden_states, video_mask, position_ids):
-        batch_size, seq_len, embed_dim = hidden_states.shape
-        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)
+        batch_size, seq_len, d = hidden_states.shape
+        video_positions = position_ids[:, video_mask.sum(axis=-1)>0]
         
-        temporal_positions = position_ids[0]  # Extract temporal indices
-        max_time = temporal_positions.max().item()
-        
-        for b in range(batch_size):
-            valid_indices = torch.nonzero(video_mask[b].flatten(), as_tuple=True)[0]
-            valid_indices_2D = torch.nonzero(video_mask[b], as_tuple=True)  # Returns (row_indices, col_indices)
-            valid_temporal_indices = valid_indices_2D[0]  # Extract only the row indices (temporal positions)
-            temporal_vals = temporal_positions[0, valid_temporal_indices]
-
-            drop_start_idx = int(self.drop_start * max_time)
-            drop_end_idx = int((1 - self.drop_end) * max_time)
-            
-            drop_mask = (temporal_vals <= drop_start_idx) | (temporal_vals >= drop_end_idx)
-            drop_indices = valid_indices[drop_mask.nonzero(as_tuple=True)[0]]
-            
-            flat_sampling_mask = sampling_mask[b].flatten()
-            flat_sampling_mask[drop_indices] = False
-            sampling_mask[b] = flat_sampling_mask.view(video_mask[b].shape)
-        
-        hidden_states = hidden_states * sampling_mask.float()
-        video_mask = video_mask & sampling_mask
-        return hidden_states, video_mask, sampling_mask
-
-class SpatialHeuristicSampler(Sampler):
-    def __init__(self, config):
-        super().__init__("spatial_heuristic")
-        self.retain_proportion = config.retain_proportion
-        self.periphery_ratio = config.periphery_ratio  # Proportion of peripheral patches to drop
-    
-    def sample(self, hidden_states, video_mask, position_ids):
-        batch_size, seq_len, embed_dim = hidden_states.shape
-        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)
-        
-        height_positions = position_ids[1]
-        width_positions = position_ids[2]
-        
-        max_h, max_w = height_positions.max().item(), width_positions.max().item()
-        periphery_h = int(self.periphery_ratio * max_h)
-        periphery_w = int(self.periphery_ratio * max_w)
+        T_min, H_min, W_min = video_positions.min(dim=1).values.tolist()
+        T_max, H_max, W_max = video_positions.max(dim=1).values.tolist()
+        sampling_mask = torch.ones((batch_size, seq_len), dtype=torch.bool, device=video_mask.device)
         
         for b in range(batch_size):
-            valid_indices = torch.nonzero(video_mask[b].flatten(), as_tuple=True)[0]
-            valid_indices_2D = torch.nonzero(video_mask[b], as_tuple=True)
-            valid_hw_indices = valid_indices_2D[0]
             
-            h_vals = height_positions[0, valid_hw_indices]
-            w_vals = width_positions[0, valid_hw_indices]
+            t_indices = position_ids[0, b]
+            h_indices = position_ids[1, b]
+            w_indices = position_ids[2, b]
             
-            drop_mask = (h_vals <= periphery_h) | (h_vals >= max_h - periphery_h) | \
-                        (w_vals <= periphery_w) | (w_vals >= max_w - periphery_w)
-            drop_indices = valid_indices[drop_mask]
+            video_tokens = video_mask[b].sum(axis=-1)>0
+            t_tokens, h_tokens, w_tokens = t_indices[video_tokens], h_indices[video_tokens], w_indices[video_tokens]
             
-            flat_sampling_mask = sampling_mask[b].flatten()
-            flat_sampling_mask[drop_indices] = False
-            sampling_mask[b] = flat_sampling_mask.view(video_mask[b].shape)
+            t_center = (T_min + T_max) / 2
+            h_center = (H_min + H_max) / 2
+            w_center = (W_min + W_max) / 2
+
+            t_dist_sq = (t_tokens - t_center) ** 2 / (2 * self.temporal_variance ** 2)
+            hw_dist_sq = ((h_tokens - h_center) ** 2 + (w_tokens - w_center) ** 2) / (2 * self.spatial_variance ** 2)
+            prob = torch.exp(-(t_dist_sq + hw_dist_sq))
+            prob /= prob.sum()
+
+            sampled_indices = torch.multinomial(prob, int((1-self.retain_proportion)*prob.numel()), replacement=False)
+
+
+            drop_mask = torch.ones_like(video_tokens, dtype=torch.bool)
+            drop_mask[video_tokens.nonzero(as_tuple=True)[0][sampled_indices]] = 0
+
+            sampling_mask[b] &= drop_mask
+            
         
-        hidden_states = hidden_states * sampling_mask.float()
-        video_mask = video_mask & sampling_mask
+        hidden_states = hidden_states * sampling_mask.unsqueeze(-1)
+        video_mask = video_mask & sampling_mask.unsqueeze(-1)
         return hidden_states, video_mask, sampling_mask

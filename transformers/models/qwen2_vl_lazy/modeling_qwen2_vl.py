@@ -51,7 +51,7 @@ from ...utils import (
     replace_return_docstrings,
 )
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
-from .vt_samplers import UniformSampler, TemporalHeuristicSampler, SpatialHeuristicSampler
+from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -883,9 +883,8 @@ QWEN2_VL_ATTENTION_CLASSES = {
 }
 
 QWEN2_VL_SAMPLER_CLASSES = {
-    "random" : UniformSampler,
-    "temporal" : TemporalHeuristicSampler,
-    "spatial" : SpatialHeuristicSampler,
+    "uniform" : UniformSampler,
+    "st_gaussian" : SpatioTemporalHeuristicSampler,
 }
 
 class Qwen2VLDecoderLayer(nn.Module):
