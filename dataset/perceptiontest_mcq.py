@@ -83,8 +83,15 @@ class PerceptiontestMCQ(data.Dataset):
 
             # extract question and answer
             for mcq in mcq_list:
-                mcqs.append(mcq["question"])
-                mcq_labels.append(mcq["options"][mcq["answer_id"]])  # 获取正确答案
+                mcq_text = mcq["question"] + "\n" + "\n".join(
+                            [f"({idx}) {option}" for idx, option in enumerate(mcq["options"])]
+                            )
+                mcqs.append(mcq_text)
+
+                # (index) option_text"
+                answer_index = mcq["answer_id"]
+                answer_text = mcq["options"][answer_index]
+                mcq_labels.append(f"({answer_index}) {answer_text}")
 
         return {
             "video_paths": video_paths,

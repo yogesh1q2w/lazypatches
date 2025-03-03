@@ -4,7 +4,7 @@
 #SBATCH --time=00:10:00 
 #SBATCH --job-name=run
 
-#SBATCH --output=/home/hpc/g102ea/<username>/lazypatches/eval.log
+#SBATCH --output=/home/hpc/g102ea/g102ea12/lazypatches/eval.log
 
 #SBATCH --export=None
 
@@ -12,4 +12,4 @@ module add python
 conda activate m3project
 source .env/bin/activate
 
-python3 inference/run.py > output.out
+python3 inference/run_action.py > output.out
