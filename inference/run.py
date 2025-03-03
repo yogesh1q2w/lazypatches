@@ -50,7 +50,7 @@ print(output_text)
 
 
 # Video
-video_info = {"type": "video", "video": "./test_files/video.mp4", "fps": 1.0}
+video_info = {"type": "video", "video": "./test_files/monkey.gif", "fps": 1.0}
 video = fetch_video(video_info)
 conversation = [
     {
