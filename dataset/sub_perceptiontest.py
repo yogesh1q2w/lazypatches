@@ -55,7 +55,7 @@ class SubPerceptiontestMCQ(data.Dataset):
 
             mcq_data = self.prepare(video_mcqs_info, videos_path, subset_data)
             
-            mcq_data = self.prepare(video_mcqs_info, videos_path)
+            # mcq_data = self.prepare(video_mcqs_info, videos_path)
             
             self.data = {"videos_path": videos_path,
                             "labels_path": labels_path,

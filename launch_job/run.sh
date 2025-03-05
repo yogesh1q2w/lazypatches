@@ -12,4 +12,4 @@ module add python
 conda activate m3project
 source .env/bin/activate
 
-python3 inference/run_action.py > output.out
+python3 inference/run_sub_action.py > sub_perceptiontest_output.out
