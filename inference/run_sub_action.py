@@ -77,8 +77,9 @@ for step, data in enumerate(data_loader):
     #     break
     start_time = time.time()  # <-- Start timer
     
-    idx, video, question, answer = data
-    
+    #-------------------------------------change----------------------------------
+    idx, video, question, answer, area, tag = data
+    #------------------------------------------------------------------
 
     idx = idx[0]
     video = video.squeeze(0)

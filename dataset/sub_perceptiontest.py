@@ -5,6 +5,14 @@ from tqdm import tqdm
 import torch.utils.data as data
 from inference.utils.vision_process import fetch_video
 
+
+Prompts_pre = f"Select the best answer to the following multiple-choice question based on the video. Respond with only the letter (A, B, C, or D) of the correct option."
+Prompts_suf = f"The best answer is:"
+
+num_mapping = {0 : "A",
+               1 : "B",
+               2 : "C"}
+
 def parse_video_and_mcq_json(filename):
     with open(filename, "r") as f:
         data = json.load(f)
@@ -72,6 +80,9 @@ class SubPerceptiontestMCQ(data.Dataset):
         video_ids = []
         mcqs = []
         mcq_labels = []
+        
+        mcq_areas = []
+        mcq_tags = []
 
         for video_id, video_info in tqdm(video_mcqs_info.items()):
                     # If the video is not in the subset data, skip it
@@ -84,14 +95,17 @@ class SubPerceptiontestMCQ(data.Dataset):
                     # Filter the mcq_list to only include questions in the subset
                     for mcq in mcq_list:
                         if mcq["id"] in subset_data[video_id]:
-                            mcq_text = mcq["question"] + "\n" + "\n".join(
-                                [f"({idx}) {option}" for idx, option in enumerate(mcq["options"])]
-                            )
+                            mcq_text = Prompts_pre + "\n" + mcq["question"] + "\n" + "\n".join(
+                                [f"{num_mapping[idx]}. {option}" for idx, option in enumerate(mcq["options"])]
+                            ) + "\n" + Prompts_suf
                             mcqs.append(mcq_text)
 
                             answer_index = mcq["answer_id"]
-                            answer_text = mcq["options"][answer_index]
-                            mcq_labels.append(f"({answer_index}) {answer_text}")
+                            # answer_text = mcq["options"][answer_index]
+                            mcq_labels.append(f"{num_mapping[answer_index]}")
+                            
+                            mcq_areas.append(mcq["area"])
+                            mcq_tags.append(mcq["tag"])
                             
                             video_paths.append(video_path)
                             video_ids.append(video_id)
@@ -100,6 +114,8 @@ class SubPerceptiontestMCQ(data.Dataset):
             "video_ids": video_ids,
             "mcqs": mcqs,
             "mcq_labels": mcq_labels,
+            "mcq_areas" : mcq_areas,
+            "mcq_tags" : mcq_tags
         }
 
     def __getitem__(self, index):
@@ -115,8 +131,11 @@ class SubPerceptiontestMCQ(data.Dataset):
         video_info = {"type": "video", "video": path, "fps": self.target_fps}
         video = fetch_video(video_info)
         question = self.data["mcq_data"]["mcqs"][index]
+        
+        area = self.data["mcq_data"]["mcq_areas"][index]
+        tag = self.data["mcq_data"]["mcq_tags"][index]
 
-        return index, video, question, answer
+        return index, video, question, answer, area, tag
 
     def __len__(self):
         return self.data["n_samples"]
