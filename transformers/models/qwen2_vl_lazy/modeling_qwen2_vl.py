@@ -1179,7 +1179,6 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                 .expand_as(inputs_embeds)
                 .to(inputs_embeds.device)
             )
-        #     print(f'Video mask is none :{video_mask is None}; Video mask is filled with only false values : {not video_mask.any().item()}')
 
         if cache_position is None:
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
@@ -1196,8 +1195,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         causal_mask = self._update_causal_mask(
             attention_mask, inputs_embeds, cache_position, past_key_values, output_attentions
         )
-        # vision_index_start = -1
-        # vision_index_end = -1
+
         hidden_states = inputs_embeds
         sampling_mask = None
         # create position embeddings to be shared across the decoder layers
@@ -1651,10 +1649,7 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                 position_ids[..., i, attention_mask[i] == 1] = llm_positions.to(position_ids.device)
                 mrope_position_deltas.append(llm_positions.max() + 1 - len(total_input_ids[i]))
             mrope_position_deltas = torch.tensor(mrope_position_deltas, device=input_ids.device).unsqueeze(1)
-            # print(f'The positional ids for the input video is {position_ids}. ')
-            # print(f'the shape of the posiitonal ids are : {position_ids.shape}')
-            # print(f'The mrope delta is {mrope_position_deltas}')
-            # print(f'the shape of mrope position deltas is {mrope_position_deltas.shape}')
+
             return position_ids, mrope_position_deltas
         else:
             if attention_mask is not None:
@@ -1674,10 +1669,7 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                     device=input_ids.device,
                     dtype=input_ids.dtype,
                 )
-            # print(f'The positional ids for the input video is {position_ids}. ')
-            # print(f'the shape of the posiitonal ids are : {position_ids.shape()}')
-            # print(f'The mrope delta is {mrope_position_deltas}')
-            # print(f'the shape of mrope position deltas is {mrope_position_deltas.shape()}')
+
             return position_ids, mrope_position_deltas
 
     @add_start_docstrings_to_model_forward(QWEN2_VL_INPUTS_DOCSTRING)

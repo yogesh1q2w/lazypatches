@@ -25,26 +25,19 @@ class UniformSampler(Sampler):
     def sample(self, hidden_states, video_mask, position_ids, input_ids):
         batch_size, seq_len, embed_dim = hidden_states.shape
 
-        # Initialize sampling_mask with the same dimensions as video_mask
-        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)  # Shape: (batch_size, seq_len, embed_dim)
+        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)
 
-        # Iterate over the batch to randomly drop (1 - retain_proportion) values where video_mask is True
         for b in range(batch_size):
-            # Get the indices where video_mask is True for the current batch
-            true_indices = torch.nonzero(video_mask[b].flatten(), as_tuple=True)[0]  # Shape: (num_valid_positions,)
-            num_to_drop = int((1 - self.retain_proportion) * true_indices.size(0))  # Number of values to drop
+            true_indices = torch.nonzero(video_mask[b].flatten(), as_tuple=True)[0]
+            num_to_drop = int((1 - self.retain_proportion) * true_indices.size(0))
 
-            # Randomly select indices to drop
             drop_indices = true_indices[torch.randperm(true_indices.size(0))[:num_to_drop]]
 
-            # Flatten the sampling_mask for the current batch, set selected indices to False
             flat_sampling_mask = sampling_mask[b].flatten()
             flat_sampling_mask[drop_indices] = False
 
-            # Reshape back to original shape
             sampling_mask[b] = flat_sampling_mask.view(video_mask[b].shape)
 
-        # Apply the sampling mask to hidden_states directly
         hidden_states = hidden_states * sampling_mask.float()
         video_mask = video_mask & sampling_mask
 
@@ -102,10 +95,6 @@ class SpatioTemporalHeuristicSampler(Sampler):
         return hidden_states, video_mask, sampling_mask
 
 
-# For simplicity in calculation in KMClosestTokenSampler, we treat K as the
-# number of text indices to select from the prompt provided and 'retain_proportion'
-# as the proportion of video indices to be retained from the sequence itself.
-# In other methods, 'retain_proportion' corresponds to proportion in entire hidden_states.
 class KMclosestTokenSampler(Sampler):
     def __init__(self, config):
         super().__init__("km_closest")
@@ -163,8 +152,6 @@ class KMclosestTokenSampler(Sampler):
 
                     selected_text.append(next_text_token)
 
-            # if possible access to token ids and get the words at those indices
-            # Select m closest video tokens for each farthest text token
             selected_video = set()
             remaining_video_indices = video_indices.clone()
             for text_token in selected_text:
@@ -188,10 +175,9 @@ class KMclosestTokenSampler(Sampler):
                 )
                 remaining_video_indices = remaining_video_indices[mask]
 
-            # Update sampling mask: zero out unselected video tokens
             selected_video = torch.tensor(list(selected_video), device=hidden_states.device)
-            sampling_mask[b, video_indices] = False  # Mask out all video tokens initially
-            sampling_mask[b, selected_video] = True  # Retain selected video tokens
+            sampling_mask[b, video_indices] = False
+            sampling_mask[b, selected_video] = True
 
         hidden_states = hidden_states * sampling_mask.float()
         video_mask = video_mask & sampling_mask

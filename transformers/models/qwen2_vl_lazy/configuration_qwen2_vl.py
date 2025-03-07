@@ -147,19 +147,37 @@ class Qwen2VLConfig(PretrainedConfig):
                     Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
                 `high_freq_factor` (`float`, *optional*):
                     Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
-        vt_sampling_strategy (`str`, *optional*, defaults to None):
-            Technique to use for sampling during Visual token selection. If None, the model will use all the tokens (no subsampling).
-            4 samplers will be placed in total: After 0%, 25%, 50% and 75% of decoder_layer blocks in the LLM
+
+        selector_implementation (`str`, defaults to cmd line argument[3]):
+            Technique to use for uni-layer sampling during Visual token selection in LLM. If 'None', the model will use all the tokens (no subsampling).
             Expected contents:
                `None`: No subsampling is used
-               `uniform`: Uniform sampling is used, need to specify sampled proportion for all 4 samplers
-               `gaussian`: Gaussian at center heuristic sampling is used, need to specify max. sampled proportion for all 4 samplers
-               `rl`: Reinforcement learning based sampling is used, need to specify max. sampled proportion for all 4 samplers
+               `uniform`: Uniform sampling is used, need to specify sampled proportion.
+               `st_gaussian`: Gaussian at center heuristic sampling is used along temporal and spatial dimension, need to specify variance. (Assumption: Spatial_Variance = Temporal_Variance)
+               `km_closest`: k-farthest text tokens select m-closest video tokens to subsample k*m
 
-        vt_sampling_proportion (`List[float]`, *optional*, defaults to None):
-            List of proportions for each sampler. If `vt_sampling_strategy` is not None, this list should have 4 elements.
-            If `vt_sampling_strategy` is `None`, this list is ignored.
-            If `vt_sampling_strategy` is `rl`, the elements of this list represent the maximum proportion of tokens RL-based sampling will retain.
+        retain_proportion (`float`, defaults to cmd line argument[2]):
+            Proportion of visual tokens to be retained by unilayer sampler.
+            If `selector_implementation` is not None, this should have non-zero value in (0.0, 1.0).
+            If `selector_implementation` is `None`, this value is ignored.
+
+        dropping_position (`int`, defaults to cmd line argument[6]):
+            Position(#Layer) in LLM model where visual token sampling is implemented.
+            If `selector_implementation` is not None, this should have values in [0, num_hidden_layers).
+
+        temporal_variance (`float`, defaults to cmd line argument[5]):
+            Variance for `st_gaussian` visual token selector along temporal dimension.
+            If `selector_implementation` is `st_gaussian`, this should have non-zero value.
+
+        spatial_variance (`float`, defaults to cmd line argument[5]):
+            Variance for `st_gaussian` visual token selector along spatial dimension.
+            If `selector_implementation` is `st_gaussian`, this should have non-zero value.
+
+            (*For experimental convenience, we assume temporal_variance = spatial_variance*)
+
+        k_farthest (`float`, defaults to cmd line argument[5]):
+            k_farthest corresponds to proportion of text sequence(user prompt) to be considered for nearest video token selection.
+            If `selector_implementation` is `km_closest`, this should have non-zero value in (0.0, 1.0].
 
 
     ```python
@@ -200,8 +218,6 @@ class Qwen2VLConfig(PretrainedConfig):
         attention_dropout=0.0,
         vision_config=None,
         rope_scaling=None,
-        vt_sampling_strategy=None,
-        vt_sampling_proportion: List[float] = None,
         dropping_position=int(sys.argv[6]),
         selector_implementation=sys.argv[3],
         retain_proportion=float(sys.argv[2]),
@@ -237,15 +253,13 @@ class Qwen2VLConfig(PretrainedConfig):
         self.rope_theta = rope_theta
         self.attention_dropout = attention_dropout
         self.rope_scaling = rope_scaling
-        self.vt_sampling_strategy = vt_sampling_strategy
-        self.vt_sampling_proportion = vt_sampling_proportion
-        self.k_farthest = k_farthest
 
         self.dropping_position = dropping_position
         self.selector_implementation = selector_implementation
         self.retain_proportion = retain_proportion
         self.temporal_variance = temporal_variance
         self.spatial_variance = spatial_variance
+        self.k_farthest = k_farthest
 
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, move it to 'rope_type'.
