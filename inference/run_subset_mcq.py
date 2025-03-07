@@ -31,16 +31,16 @@ DROPPING_POSITION = int(sys.argv[6])
 TARGET_PATH = f"/home/atuin/g102ea/shared/group_10/results/"
 
 if SAMPLER_TYPE == "None":
-    TARGET_PATH = os.path.join(TARGET_PATH, 'baseline')
+    TARGET_PATH = os.path.join(TARGET_PATH, "baseline")
 
-elif SAMPLER_TYPE == "km_closest" and HYPERPARAM!=0.5:
-    TARGET_PATH = os.path.join(TARGET_PATH, 'ablation')
+elif SAMPLER_TYPE == "km_closest" and HYPERPARAM != 0.5:
+    TARGET_PATH = os.path.join(TARGET_PATH, "ablation")
 
 elif DATASET == "charades":
-    TARGET_PATH = os.path.join(TARGET_PATH, 'charades')
+    TARGET_PATH = os.path.join(TARGET_PATH, "charades")
 
 elif DATASET == "perceptiontest":
-    TARGET_PATH = os.path.join(TARGET_PATH, 'perceptiontest')
+    TARGET_PATH = os.path.join(TARGET_PATH, "perceptiontest")
 
 SUB_FOLDER = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
 TARGET_PATH = os.path.join(TARGET_PATH, SUB_FOLDER)

@@ -90,7 +90,9 @@ class SpatioTemporalHeuristicSampler(Sampler):
         hidden_states = hidden_states * sampling_mask.unsqueeze(-1)
         video_mask = video_mask & sampling_mask.unsqueeze(-1)
 
-        print(f"SAMPLING RATE FOR GAUSSIAN(sigma_t={self.temporal_variance}, sigma_s={self.spatial_variance}) IS {(1-self.retain_proportion)*100}%")
+        print(
+            f"SAMPLING RATE FOR GAUSSIAN(sigma_t={self.temporal_variance}, sigma_s={self.spatial_variance}) IS {(1-self.retain_proportion)*100}%"
+        )
 
         return hidden_states, video_mask, sampling_mask
 
