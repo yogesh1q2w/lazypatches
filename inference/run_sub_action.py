@@ -5,18 +5,19 @@ import json
 import logging
 import time
 from transformers.models.qwen2_vl_lazy import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
-# from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
 
 from torch.utils.data import DataLoader
 from dataset.sub_charades_action import Sub_CharadesActionMCQ
+from dataset.sub_perceptiontest import SubPerceptiontestMCQ
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SAVE_EVERY = 10
 
 MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
 
-ROOT_PATH = "/home/atuin/g102ea/g102ea12/dataset"
-DATASET_PATH = os.path.join(ROOT_PATH, "charades")
+DATASET = "perceptiontest"
+ROOT_PATH = "/home/atuin/g102ea/shared/group_10/datasets"
+DATASET_PATH = os.path.join(ROOT_PATH, DATASET)
 
 LLM_FPS = float(sys.argv[1])
 RETENTION_RATE = float(sys.argv[2])
@@ -40,17 +41,28 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 RELOAD=True
-if RELOAD:
-    charades_dataset = Sub_CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json", reload=RELOAD)
-else:
-    charades_dataset = Sub_CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json",
-                                    videos_path=os.path.join(DATASET_PATH, "videos/Charades_v1"),
-                                    labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
-                                    classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
-                                    n_wrong_options=4,
-                                    reload=RELOAD
-                                    )
-
+if DATASET == "charades":
+    if RELOAD:
+        dataset = Sub_CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json", reload=RELOAD)
+    else:
+        dataset = Sub_CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json",
+                                        videos_path=os.path.join(DATASET_PATH, "videos/Charades_v1"),
+                                        labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
+                                        classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
+                                        n_wrong_options=4,
+                                        reload=RELOAD
+                                        )
+elif DATASET == "perceptiontest":
+    if RELOAD:
+        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/sub_perceptiontest_mcq.json", reload=RELOAD)
+    else:
+        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/sub_perceptiontest_mcq.json",
+                                        videos_path=os.path.join(DATASET_PATH, "valid/videos"),
+                                        labels_path=os.path.join(DATASET_PATH, "valid/all_valid.json"),
+                                        # classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
+                                        # n_wrong_options=4,
+                                        reload=RELOAD
+                                        )
 
 # Load the model in half-precision on the available device(s)
 model = Qwen2VLForConditionalGeneration.from_pretrained(MODEL_CHECKPOINT_PATH, device_map="auto", torch_dtype="auto")
@@ -63,18 +75,18 @@ def normalize_text(text):
     """Normalize text for comparison"""
     return text.strip().lower() if isinstance(text, str) else ""
 
-data_loader = DataLoader(dataset=charades_dataset, batch_size=1, shuffle=False)
-print("Length of dataset: ", len(charades_dataset), flush=True)
+data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+print("Length of dataset: ", len(dataset), flush=True)
 results = []
 failed_indices = []
 
 for step, data in enumerate(data_loader):
-    if step >= 10:
-        break
     start_time = time.time()  # <-- Start timer
     
-    idx, video, question, answer = data
-    
+    if DATASET == "charades":
+        idx, video, question, answer = data
+    elif DATASET == "perceptiontest":
+        idx, video, question, answer, area, tag = data
 
     idx = idx[0]
     video = video.squeeze(0)
@@ -131,7 +143,7 @@ for step, data in enumerate(data_loader):
     
     if step % 10 == 0:
         current_accuracy = sum(r["is_correct"] for r in results) / len(results) if len(results) > 0 else 0
-        logger.info(f"Processed {step}/{len(charades_dataset)} - Current ACC: {current_accuracy:.4f}")
+        logger.info(f"Processed {step}/{len(dataset)} - Current ACC: {current_accuracy:.4f}")
 
     if step % SAVE_EVERY == 0:
         json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
