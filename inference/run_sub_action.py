@@ -2,20 +2,43 @@ import os
 import sys
 import torch
 import json
-from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
+import logging
+import time
+from transformers.models.qwen2_vl_lazy import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
 
 from torch.utils.data import DataLoader
 from dataset.sub_charades_action import Sub_CharadesActionMCQ
 from dataset.sub_perceptiontest import SubPerceptiontestMCQ
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-SAVE_EVERY = 100
+SAVE_EVERY = 10
 
 MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
+
 DATASET = "perceptiontest"
 ROOT_PATH = "/home/atuin/g102ea/shared/group_10/datasets"
 DATASET_PATH = os.path.join(ROOT_PATH, DATASET)
 
+LLM_FPS = float(sys.argv[1])
+RETENTION_RATE = float(sys.argv[2])
+SAMPLER_TYPE = sys.argv[3]
+DATASET = sys.argv[4]
+HYPERPARAM = float(sys.argv[5])
+DROPPING_POSITION = int(sys.argv[6])
+
+#argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
+ 
+TARGET_PATH = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s - %(levelname)s - %(message)s",
+    handlers=[
+        logging.FileHandler(os.path.join(TARGET_PATH, "evaluation.log")),  # Log to a file
+        logging.StreamHandler(sys.stdout),      # Log to console
+    ]
+)
+logger = logging.getLogger(__name__)
 
 RELOAD=True
 if DATASET == "charades":
@@ -43,9 +66,14 @@ elif DATASET == "perceptiontest":
 
 # Load the model in half-precision on the available device(s)
 model = Qwen2VLForConditionalGeneration.from_pretrained(MODEL_CHECKPOINT_PATH, device_map="auto", torch_dtype="auto")
-processor = AutoProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
+processor = Qwen2VLProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 
 print("Loading model complete", flush=True)
+print("random")
+
+def normalize_text(text):
+    """Normalize text for comparison"""
+    return text.strip().lower() if isinstance(text, str) else ""
 
 data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
 print("Length of dataset: ", len(dataset), flush=True)
@@ -53,6 +81,7 @@ results = []
 failed_indices = []
 
 for step, data in enumerate(data_loader):
+    start_time = time.time()  # <-- Start timer
     
     if DATASET == "charades":
         idx, video, question, answer = data
@@ -82,18 +111,59 @@ for step, data in enumerate(data_loader):
         output_ids = model.generate(**inputs, max_new_tokens=128)
         generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
         output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+        end_time = time.time()  # <-- End timer
+        elapsed_time = end_time - start_time  # <-- Calculate time
         print(int(idx), output_text[0], flush=True)
         print(answer, flush=True)
         print("-------------------", flush=True)
-        results.append({"idx": int(idx), "answer": answer, "output": output_text[0]})
+
+        # Evaluate correctness
+        pred = normalize_text(output_text[0]) if isinstance(output_text, list) and output_text else ""
+        gt = normalize_text(answer)
+        is_correct = any([
+            gt in pred,       # Check if answer is substring of prediction
+            pred == gt,       # Exact match
+            pred.startswith(gt.split()[0])  # Handle partial matches
+        ])
+
+        # Store results
+        results.append({
+            "idx": int(idx),
+            "question": question,
+            "answer": answer,
+            "prediction": output_text,
+            "is_correct": is_correct,
+            "processing_time": elapsed_time  # <-- Store processing time
+        })
         torch.cuda.empty_cache()
-    except:
+    except Exception as e:
+        logger.info(f'Exception thrown is {e}')
         failed_indices.append(int(idx))
+        torch.cuda.empty_cache()
     
+    if step % 10 == 0:
+        current_accuracy = sum(r["is_correct"] for r in results) / len(results) if len(results) > 0 else 0
+        logger.info(f"Processed {step}/{len(dataset)} - Current ACC: {current_accuracy:.4f}")
+
     if step % SAVE_EVERY == 0:
-        json.dump(results, open("results.json", "w"))
-        json.dump(failed_indices, open("failed_indices.json", "w"))
+        json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
+        json.dump(failed_indices, open(os.path.join(TARGET_PATH,"failed_indices.json"), "w"))
         print(f"saved till step {step}", file=sys.stderr)
+    torch.cuda.empty_cache()
     
-json.dump(results, open("results.json", "w"))
-json.dump(failed_indices, open("failed_indices.json", "w"))
+json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
+json.dump(failed_indices, open(os.path.join(TARGET_PATH,"failed_indices.json"), "w"))
+
+
+# Calculate final metrics
+correct = sum(r["is_correct"] for r in results)
+total = len(results)  # Only successful samples
+total_attempts = total + len(failed_indices)  # Include failed attempts
+accuracy = correct / total if total > 0 else 0
+error_rate = len(failed_indices) / total_attempts if total_attempts > 0 else 0
+
+logger.info("\nFinal Evaluation Results:")
+logger.info(f"Processed Samples: {total_attempts}")
+logger.info(f"Failed Samples: {len(failed_indices)}")
+logger.info(f"Accuracy: {accuracy:.4f} ({correct}/{total})")
+logger.info(f"Error Rate: {error_rate:.4f}")

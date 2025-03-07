@@ -14,7 +14,7 @@
 # limitations under the License.
 """Qwen2VL model configuration"""
 from typing import List
-
+import sys
 from ...configuration_utils import PretrainedConfig
 from ...modeling_rope_utils import rope_config_validation
 from ...utils import logging
@@ -202,9 +202,12 @@ class Qwen2VLConfig(PretrainedConfig):
         rope_scaling=None,
         vt_sampling_strategy=None,
         vt_sampling_proportion: List[float]=None,
-        selector_iter = None,
-        selector_implementation = "random",
-        retain_proportion = 0.99,
+        dropping_position = int(sys.argv[6]),
+        selector_implementation = sys.argv[3],
+        retain_proportion = float(sys.argv[2]),
+        temporal_variance = float(sys.argv[5]),
+        spatial_variance = float(sys.argv[5]),
+        k_farthest = float(sys.argv[5]),
         **kwargs,
     ):
         if isinstance(vision_config, dict):
@@ -236,11 +239,14 @@ class Qwen2VLConfig(PretrainedConfig):
         self.rope_scaling = rope_scaling
         self.vt_sampling_strategy = vt_sampling_strategy
         self.vt_sampling_proportion = vt_sampling_proportion
+        self.k_farthest = k_farthest
 
-        self.selector_iter = self.num_hidden_layers//4 if selector_iter is None else selector_iter
+        self.dropping_position = dropping_position
         self.selector_implementation = selector_implementation
         self.retain_proportion = retain_proportion
-
+        self.temporal_variance = temporal_variance
+        self.spatial_variance = spatial_variance
+        
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, move it to 'rope_type'.
         # and change type from 'mrope' to 'default' because `mrope` does defeault RoPE calculations

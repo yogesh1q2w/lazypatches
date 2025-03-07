@@ -20,6 +20,7 @@
 """PyTorch Qwen2-VL model."""
 
 import math
+import sys
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
@@ -49,8 +50,9 @@ from ...utils import (
     logging,
     replace_return_docstrings,
 )
+from .lazy_utils import fps_reduction
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
-from .vt_samplers import UniformSampler
+from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler, KMclosestTokenSampler
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -64,6 +66,9 @@ logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "Qwen2VLConfig"
 
+RETENTION_RATE = float(sys.argv[2])
+SAMPLER_TYPE = sys.argv[3]
+LLM_FPS = float(sys.argv[1])
 
 @dataclass
 class Qwen2VLCausalLMOutputWithPast(ModelOutput):
@@ -796,21 +801,21 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
 
-        # Apply the sampling mask to key and value states
-        if sampling_mask is not None:
-            # divide embeddding space into number of heads  -> since key states embedding is divided by num_heads, we need to divide the mask into similar way as well 
-            bsz, seq_len, embed_dim = sampling_mask.shape
-            assert embed_dim % self.num_heads == 0, "Embedding dimension must be divisible by the number of heads"
-            head_dim = embed_dim // self.num_heads  # Calculate head_dim
+        # # Apply the sampling mask to key and value states
+        # if sampling_mask is not None:
+        #     # divide embeddding space into number of heads  -> since key states embedding is divided by num_heads, we need to divide the mask into similar way as well 
+        #     bsz, seq_len, embed_dim = sampling_mask.shape
+        #     assert embed_dim % self.num_heads == 0, "Embedding dimension must be divisible by the number of heads"
+        #     head_dim = embed_dim // self.num_heads  # Calculate head_dim
             
-            # Reshape sampling_mask to split embed_dim into num_key_value_heads per num_key_value_groups and head_dim (due to Grouped Query Attention mechanism https://arxiv.org/pdf/2305.13245)
-            sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads, self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
-            #for masking key value states, taking average across groups and thresholding the average float to get boolean mask
-            sampling_mask_mean = torch.mean(sampling_mask.float(), dim=2)  # [bsz, num_heads, seq_len, head_dim]
-            sampling_mask_mean = sampling_mask_mean >= 0.5
-            # Apply the sampling mask to key_states and value_states
-            key_states = key_states * sampling_mask_mean  
-            value_states = value_states * sampling_mask_mean
+        #     # Reshape sampling_mask to split embed_dim into num_key_value_heads per num_key_value_groups and head_dim (due to Grouped Query Attention mechanism https://arxiv.org/pdf/2305.13245)
+        #     sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads, self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
+        #     #for masking key value states, taking average across groups and thresholding the average float to get boolean mask
+        #     sampling_mask_mean = torch.mean(sampling_mask.float(), dim=2)  # [bsz, num_heads, seq_len, head_dim]
+        #     sampling_mask_mean = sampling_mask_mean >= 0.5
+        #     # Apply the sampling mask to key_states and value_states
+        #     key_states = key_states * sampling_mask_mean  
+        #     value_states = value_states * sampling_mask_mean
             
         if position_embeddings is None:
             logger.warning_once(
@@ -858,11 +863,11 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
             is_causal=is_causal,
         )
 
-        # Apply sampling mask to attention weights
-        if sampling_mask is not None:
-            #reshaping sampling_mask to [bsz, num_heads, seq_len, embed_dim]
-            sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads * self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
-            attn_output = attn_output * sampling_mask
+        # # Apply sampling mask to attention weights
+        # if sampling_mask is not None:
+        #     #reshaping sampling_mask to [bsz, num_heads, seq_len, embed_dim]
+        #     sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads * self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
+        #     attn_output = attn_output * sampling_mask
 
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.view(bsz, q_len, self.hidden_size)
@@ -879,7 +884,9 @@ QWEN2_VL_ATTENTION_CLASSES = {
 }
 
 QWEN2_VL_SAMPLER_CLASSES = {
-    "random" : UniformSampler,
+    "uniform" : UniformSampler,
+    "st_gaussian" : SpatioTemporalHeuristicSampler,
+    "km_closest" : KMclosestTokenSampler,
 }
 
 class Qwen2VLDecoderLayer(nn.Module):
@@ -1103,7 +1110,7 @@ class Qwen2VisionTransformerPretrainedModel(Qwen2VLPreTrainedModel):
     QWEN2VL_START_DOCSTRING,
 )
 class Qwen2VLModel(Qwen2VLPreTrainedModel):
-    def __init__(self, config: Qwen2VLConfig):
+    def __init__(self, config: Qwen2VLConfig(selector_implementation =  SAMPLER_TYPE, retain_proportion = RETENTION_RATE)):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -1117,7 +1124,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         self.rotary_emb = Qwen2VLRotaryEmbedding(config=config)
 
         self.sampler = QWEN2_VL_SAMPLER_CLASSES[config.selector_implementation](config)
-        self.selector_iter = config.selector_iter
+        self.dropping_position = config.dropping_position
 
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
@@ -1154,9 +1161,6 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         # commented by team-lazy to propagate input ids
         # if (input_ids is None) ^ (inputs_embeds is not None):
         #     raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
-        print('********************************************************************************')
-        print(f'The number of hidden layers in the model are : {self.config.num_hidden_layers}')
-        print('********************************************************************************')
         
         if self.gradient_checkpointing and self.training:
             if use_cache:
@@ -1179,7 +1183,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                     .expand_as(inputs_embeds)
                     .to(inputs_embeds.device)
                 )
-            print(f'Video mask is none :{video_mask is None}; Video mask is filled with only false values : {not video_mask.any().item()}')
+        #     print(f'Video mask is none :{video_mask is None}; Video mask is filled with only false values : {not video_mask.any().item()}')
 
         if cache_position is None:
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
@@ -1210,15 +1214,14 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
 
 
         for idx, decoder_layer in enumerate(self.layers):
-            if idx % self.selector_iter == 0:
+            if idx == self.dropping_position and SAMPLER_TYPE is not None:
                 if video_mask.any().item():
-                    hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask)
-                    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+                    hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids, input_ids)
+                    print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
+                    # import pdb; pdb.set_trace()
                 else:
-                    print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Video Mask at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-            # else:
-            #     print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Sampling at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-
+                    pass
+                
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -1359,7 +1362,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         device: torch.device,
         cache_position: torch.Tensor,
         batch_size: int,
-        config: Qwen2VLConfig,
+        config: Qwen2VLConfig(selector_implementation = SAMPLER_TYPE, retain_proportion = RETENTION_RATE),
         past_key_values: Cache,
     ):
         """
@@ -1653,6 +1656,10 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                 position_ids[..., i, attention_mask[i] == 1] = llm_positions.to(position_ids.device)
                 mrope_position_deltas.append(llm_positions.max() + 1 - len(total_input_ids[i]))
             mrope_position_deltas = torch.tensor(mrope_position_deltas, device=input_ids.device).unsqueeze(1)
+            # print(f'The positional ids for the input video is {position_ids}. ')
+            # print(f'the shape of the posiitonal ids are : {position_ids.shape}')
+            # print(f'The mrope delta is {mrope_position_deltas}')
+            # print(f'the shape of mrope position deltas is {mrope_position_deltas.shape}')
             return position_ids, mrope_position_deltas
         else:
             if attention_mask is not None:
@@ -1672,7 +1679,10 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                     device=input_ids.device,
                     dtype=input_ids.dtype,
                 )
-
+            # print(f'The positional ids for the input video is {position_ids}. ')
+            # print(f'the shape of the posiitonal ids are : {position_ids.shape()}')
+            # print(f'The mrope delta is {mrope_position_deltas}')
+            # print(f'the shape of mrope position deltas is {mrope_position_deltas.shape()}')
             return position_ids, mrope_position_deltas
 
     @add_start_docstrings_to_model_forward(QWEN2_VL_INPUTS_DOCSTRING)
@@ -1766,6 +1776,9 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
             if pixel_values_videos is not None:
                 pixel_values_videos = pixel_values_videos.type(self.visual.get_dtype())
                 video_embeds = self.visual(pixel_values_videos, grid_thw=video_grid_thw)
+                # import pdb
+                # pdb.set_trace()
+                video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw = fps_reduction(video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw, llm_fps=LLM_FPS, video_token_id=self.config.video_token_id)
                 n_video_tokens = (input_ids == self.config.video_token_id).sum().item()
                 n_video_features = video_embeds.shape[0]
                 if n_video_tokens != n_video_features:
@@ -1802,18 +1815,6 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                     delta = delta.repeat_interleave(batch_size // delta.shape[0], dim=0)
                 position_ids = position_ids.add(delta)
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
-
-        # print('--------------hidden-states shape----')
-        # print(inputs_embeds.shape)
-        # print('-------position ids-------')
-        # print(position_ids)
-        # print('-------position ids shape-------')
-        # print(position_ids.shape)
-        # print('---------input ids-----')
-        # print(input_ids)
-        # print('---------input ids shape-----')
-        # print(input_ids.shape)
-        
 
         outputs = self.model(
             input_ids=input_ids,
