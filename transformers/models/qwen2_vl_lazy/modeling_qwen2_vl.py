@@ -20,6 +20,7 @@
 """PyTorch Qwen2-VL model."""
 
 import math
+import sys
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
@@ -49,8 +50,9 @@ from ...utils import (
     logging,
     replace_return_docstrings,
 )
+from .lazy_utils import fps_reduction
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
-from .vt_samplers import UniformSampler, TemporalHeuristicSampler, SpatialHeuristicSampler
+from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler, KMclosestTokenSampler
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -64,6 +66,9 @@ logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "Qwen2VLConfig"
 
+RETENTION_RATE = float(sys.argv[2])
+SAMPLER_TYPE = sys.argv[3]
+LLM_FPS = float(sys.argv[1])
 
 @dataclass
 class Qwen2VLCausalLMOutputWithPast(ModelOutput):
@@ -879,9 +884,9 @@ QWEN2_VL_ATTENTION_CLASSES = {
 }
 
 QWEN2_VL_SAMPLER_CLASSES = {
-    "random" : UniformSampler,
-    "temporal" : TemporalHeuristicSampler,
-    "spatial" : SpatialHeuristicSampler,
+    "uniform" : UniformSampler,
+    "st_gaussian" : SpatioTemporalHeuristicSampler,
+    "km_closest" : KMclosestTokenSampler,
 }
 
 class Qwen2VLDecoderLayer(nn.Module):
@@ -1105,7 +1110,7 @@ class Qwen2VisionTransformerPretrainedModel(Qwen2VLPreTrainedModel):
     QWEN2VL_START_DOCSTRING,
 )
 class Qwen2VLModel(Qwen2VLPreTrainedModel):
-    def __init__(self, config: Qwen2VLConfig):
+    def __init__(self, config: Qwen2VLConfig(selector_implementation =  SAMPLER_TYPE, retain_proportion = RETENTION_RATE)):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -1119,7 +1124,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         self.rotary_emb = Qwen2VLRotaryEmbedding(config=config)
 
         self.sampler = QWEN2_VL_SAMPLER_CLASSES[config.selector_implementation](config)
-        self.selector_iter = config.selector_iter
+        self.dropping_position = config.dropping_position
 
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
@@ -1209,15 +1214,14 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
 
 
         for idx, decoder_layer in enumerate(self.layers):
-            if idx % self.selector_iter == 0:
+            if idx == self.dropping_position and SAMPLER_TYPE is not None:
                 if video_mask.any().item():
-                    hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids)
+                    hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids, input_ids)
                     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
                     # import pdb; pdb.set_trace()
                 else:
                     pass
-                    # print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Video Mask at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-            
+                
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -1358,7 +1362,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         device: torch.device,
         cache_position: torch.Tensor,
         batch_size: int,
-        config: Qwen2VLConfig,
+        config: Qwen2VLConfig(selector_implementation = SAMPLER_TYPE, retain_proportion = RETENTION_RATE),
         past_key_values: Cache,
     ):
         """
@@ -1675,10 +1679,10 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                     device=input_ids.device,
                     dtype=input_ids.dtype,
                 )
-            print(f'The positional ids for the input video is {position_ids}. ')
-            print(f'the shape of the posiitonal ids are : {position_ids.shape()}')
-            print(f'The mrope delta is {mrope_position_deltas}')
-            print(f'the shape of mrope position deltas is {mrope_position_deltas.shape()}')
+            # print(f'The positional ids for the input video is {position_ids}. ')
+            # print(f'the shape of the posiitonal ids are : {position_ids.shape()}')
+            # print(f'The mrope delta is {mrope_position_deltas}')
+            # print(f'the shape of mrope position deltas is {mrope_position_deltas.shape()}')
             return position_ids, mrope_position_deltas
 
     @add_start_docstrings_to_model_forward(QWEN2_VL_INPUTS_DOCSTRING)
@@ -1772,6 +1776,9 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
             if pixel_values_videos is not None:
                 pixel_values_videos = pixel_values_videos.type(self.visual.get_dtype())
                 video_embeds = self.visual(pixel_values_videos, grid_thw=video_grid_thw)
+                # import pdb
+                # pdb.set_trace()
+                video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw = fps_reduction(video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw, llm_fps=LLM_FPS, video_token_id=self.config.video_token_id)
                 n_video_tokens = (input_ids == self.config.video_token_id).sum().item()
                 n_video_features = video_embeds.shape[0]
                 if n_video_tokens != n_video_features:

@@ -1,7 +1,9 @@
 import numpy as np
 import torch
+import torch.nn.functional as F
 import abc
 import random
+import pdb
 
 class Sampler(abc.ABC):
     def __init__(self, sampler_name):
@@ -11,8 +13,8 @@ class Sampler(abc.ABC):
     def sample(self, hidden_states):
         pass
 
-    def __call__(self, hidden_states, video_mask, position_ids):
-        return self.sample(hidden_states, video_mask, position_ids)
+    def __call__(self, hidden_states, video_mask, position_ids, input_ids):
+        return self.sample(hidden_states, video_mask, position_ids, input_ids)
     
 
 class UniformSampler(Sampler):
@@ -21,39 +23,7 @@ class UniformSampler(Sampler):
         self.retain_proportion = config.retain_proportion
     
     
-    def sample(self, hidden_states, video_mask, position_ids):
-        #NEW METHOD:
-        # batch_size, seq_len, embed_dim = hidden_states.shape
-
-        # # Initialize the sampling mask with the same dimensions as video_mask
-        # sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)  # Shape: (batch_size, seq_len)
-
-        # # Iterate over the batch to randomly drop (1 - retain_proportion) values where video_mask is True
-        # for b in range(batch_size):
-        #     # Get the indices where video_mask is True for the current batch
-        #     true_indices = torch.nonzero(video_mask[b], as_tuple=True)[0]  # Shape: (num_valid_positions,)
-        #     num_to_drop = int((1 - self.retain_proportion) * true_indices.size(0))  # Number of values to drop
-
-        #     # Randomly select indices to drop
-        #     drop_indices = true_indices[torch.randperm(true_indices.size(0))[:num_to_drop]]
-
-        #     # Set the selected indices in the sampling mask to False
-        #     sampling_mask[b, drop_indices] = False
-            
-        #     # import pdb; pdb.set_trace()
-
-        # # # Expand sampling_mask to match the embedding dimension of hidden_states
-        # # sampling_mask_expanded = sampling_mask.unsqueeze(-1).expand(-1, -1, embed_dim)  # Shape: (batch_size, seq_len, embed_dim)
-
-        # # Apply the sampling mask to hidden_states
-        # hidden_states = hidden_states * sampling_mask.float()
-
-        # # Update the video_mask to reflect the dropped tokens
-        # video_mask = video_mask & sampling_mask
-
-        # return hidden_states, video_mask, sampling_mask
-
-        # OLD METHOD: 
+    def sample(self, hidden_states, video_mask, position_ids, input_ids):
         batch_size, seq_len, embed_dim = hidden_states.shape
 
         # Initialize sampling_mask with the same dimensions as video_mask
@@ -78,98 +48,143 @@ class UniformSampler(Sampler):
         # Apply the sampling mask to hidden_states directly
         hidden_states = hidden_states * sampling_mask.float()
         video_mask = video_mask & sampling_mask
+        
         print(f'SAMPLING RATE FOR EXPERIMENT IS {(1-self.retain_proportion)*100}%')
+        
         return hidden_states, video_mask, sampling_mask
 
-        #NEWER METHOD::::::
-        # batch_size, seq_len, embed_dim = hidden_states.shape
-        # sampling_mask = torch.ones_like(hidden_states, dtype=torch.bool)
-        # video_states = hidden_states * video_mask.float()
-        # non_video_states = hidden_states * torch.logical_not(video_mask)
-        
-        # random_mask = [0 ,1]
-        # random_wt = [1 - self.retain_proportion, self.retain_proportion]
-        # # import pdb; pdb.set_trace()
-        # for b in range(batch_size):
-        #     for s in range(seq_len):
-        #         for e in range(embed_dim):
-        #             if video_states[b][s][e] != 0:
-        #                 mask_index = random.choices(random_mask, random_wt)[0]
-        #                 video_states[b][s][e] = video_states[b][s][e] * mask_index
-        #                 video_mask[b][s][e] = video_mask[b][s][e] * mask_index
-        #                 sampling_mask[b][s][e] = False
 
-        # updated_hidden_states = video_states + non_video_states
-
-        # return updated_hidden_states, video_mask, sampling_mask
-
-class TemporalHeuristicSampler(Sampler):
+class SpatioTemporalHeuristicSampler(Sampler):
     def __init__(self, config):
-        super().__init__("temporal_heuristic")
+        super().__init__("st_gaussian")
         self.retain_proportion = config.retain_proportion
-        self.drop_start = config.drop_start  # Proportion of early frames to drop
-        self.drop_end = config.drop_end  # Proportion of late frames to drop
+        self.temporal_variance = config.temporal_variance
+        self.spatial_variance = config.spatial_variance
     
-    def sample(self, hidden_states, video_mask, position_ids):
-        batch_size, seq_len, embed_dim = hidden_states.shape
-        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)
+    def sample(self, hidden_states, video_mask, position_ids, input_ids):
+        batch_size, seq_len, d = hidden_states.shape
+        video_positions = position_ids[:, video_mask.sum(axis=-1)>0]
         
-        temporal_positions = position_ids[0]  # Extract temporal indices
-        max_time = temporal_positions.max().item()
+        T_min, H_min, W_min = video_positions.min(dim=1).values.tolist()
+        T_max, H_max, W_max = video_positions.max(dim=1).values.tolist()
+        sampling_mask = torch.ones((batch_size, seq_len), dtype=torch.bool, device=video_mask.device)
         
         for b in range(batch_size):
-            valid_indices = torch.nonzero(video_mask[b].flatten(), as_tuple=True)[0]
-            valid_indices_2D = torch.nonzero(video_mask[b], as_tuple=True)  # Returns (row_indices, col_indices)
-            valid_temporal_indices = valid_indices_2D[0]  # Extract only the row indices (temporal positions)
-            temporal_vals = temporal_positions[0, valid_temporal_indices]
+            t_indices = position_ids[0, b]
+            h_indices = position_ids[1, b]
+            w_indices = position_ids[2, b]
+            
+            video_tokens = video_mask[b].sum(axis=-1)>0
+            t_tokens, h_tokens, w_tokens = t_indices[video_tokens], h_indices[video_tokens], w_indices[video_tokens]
+            
+            t_center = (T_min + T_max) / 2
+            h_center = (H_min + H_max) / 2
+            w_center = (W_min + W_max) / 2
 
-            drop_start_idx = int(self.drop_start * max_time)
-            drop_end_idx = int((1 - self.drop_end) * max_time)
+            t_dist_sq = (t_tokens - t_center) ** 2 / (2 * self.temporal_variance ** 2)
+            hw_dist_sq = ((h_tokens - h_center) ** 2 + (w_tokens - w_center) ** 2) / (2 * self.spatial_variance ** 2)
+            prob = torch.exp(-(t_dist_sq + hw_dist_sq))
+            prob /= prob.sum()
+
+            sampled_indices = torch.multinomial(prob, int((1-self.retain_proportion)*prob.numel()), replacement=False)
+
+
+            drop_mask = torch.ones_like(video_tokens, dtype=torch.bool)
+            drop_mask[video_tokens.nonzero(as_tuple=True)[0][sampled_indices]] = 0
+
+            sampling_mask[b] &= drop_mask
             
-            drop_mask = (temporal_vals <= drop_start_idx) | (temporal_vals >= drop_end_idx)
-            drop_indices = valid_indices[drop_mask.nonzero(as_tuple=True)[0]]
-            
-            flat_sampling_mask = sampling_mask[b].flatten()
-            flat_sampling_mask[drop_indices] = False
-            sampling_mask[b] = flat_sampling_mask.view(video_mask[b].shape)
         
-        hidden_states = hidden_states * sampling_mask.float()
-        video_mask = video_mask & sampling_mask
+        hidden_states = hidden_states * sampling_mask.unsqueeze(-1)
+        video_mask = video_mask & sampling_mask.unsqueeze(-1)
+
+        print(f'SAMPLING RATE FOR EXPERIMENT IS {(1-self.retain_proportion)*100}%')
+
         return hidden_states, video_mask, sampling_mask
 
-class SpatialHeuristicSampler(Sampler):
+
+# For simplicity in calculation in KMClosestTokenSampler, we treat K as the 
+# number of text indices to select from the prompt provided and 'retain_proportion'
+# as the proportion of video indices to be retained from the sequence itself. 
+# In other methods, 'retain_proportion' corresponds to proportion in entire hidden_states.
+class KMclosestTokenSampler(Sampler):
     def __init__(self, config):
-        super().__init__("spatial_heuristic")
+        super().__init__('km_closest')
+        self.k = config.k_farthest
         self.retain_proportion = config.retain_proportion
-        self.periphery_ratio = config.periphery_ratio  # Proportion of peripheral patches to drop
-    
-    def sample(self, hidden_states, video_mask, position_ids):
-        batch_size, seq_len, embed_dim = hidden_states.shape
-        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)
-        
-        height_positions = position_ids[1]
-        width_positions = position_ids[2]
-        
-        max_h, max_w = height_positions.max().item(), width_positions.max().item()
-        periphery_h = int(self.periphery_ratio * max_h)
-        periphery_w = int(self.periphery_ratio * max_w)
+
+    def sample(self, hidden_states, video_mask, position_ids, input_ids):
+        batch_size, seq_len, d = hidden_states.shape
+        video_positions = position_ids[:, video_mask.sum(axis=-1)>0]
+        sampling_mask =  torch.ones_like(video_mask, dtype=torch.bool)
+        video_seq_len = len(video_positions[0])
         
         for b in range(batch_size):
-            valid_indices = torch.nonzero(video_mask[b].flatten(), as_tuple=True)[0]
-            valid_indices_2D = torch.nonzero(video_mask[b], as_tuple=True)
-            valid_hw_indices = valid_indices_2D[0]
+            state_normalized = F.normalize(hidden_states[b])
+            cosine_sim = torch.mm(state_normalized, state_normalized.T) #should return seq_len, seq_len
+
+            assert torch.allclose(cosine_sim, cosine_sim.T, atol=1e-6), "Matrix is not symmetric"
+            assert torch.allclose(torch.diag(cosine_sim), torch.ones(seq_len), atol=1e-6), "Diagonal values are not all 1"
+
+            cosine_dist = -1.0 * cosine_sim
             
-            h_vals = height_positions[0, valid_hw_indices]
-            w_vals = width_positions[0, valid_hw_indices]
+            text_indices = (video_mask[b] == 0).nonzero(as_tuple=True)[0].unique()
+            video_indices = (video_mask[b] == 1).nonzero(as_tuple=True)[0].unique()
+            lower_text_bound = (input_ids[0][text_indices] == 151653).nonzero(as_tuple=True)[0].item() + 1 #User input text starts after |vision_end| token whose token id is 151653.
+            upper_text_bound = lower_text_bound + (input_ids[0][text_indices][lower_text_bound:] == 151645).nonzero(as_tuple=True)[0].item() #User input ends before the first |im_end| tag after |vision_end| is encountered. Input ID of |im_end| is 151645
             
-            drop_mask = (h_vals <= periphery_h) | (h_vals >= max_h - periphery_h) | \
-                        (w_vals <= periphery_w) | (w_vals >= max_w - periphery_w)
-            drop_indices = valid_indices[drop_mask]
+            relevant_text_indices = text_indices[lower_text_bound:upper_text_bound]
+
+            num_text_tokens = int(self.k * len(relevant_text_indices))
+            m = (self.retain_proportion * video_seq_len) // num_text_tokens
+
+            selected_text = []
+            cosine_dist_text = cosine_dist.clone()
+            if(len(relevant_text_indices)==num_text_tokens):
+                selected_text = relevant_text_indices
+
+            elif(num_text_tokens < len(relevant_text_indices)):
+                selected_text = [relevant_text_indices[torch.randint(0, len(relevant_text_indices), (1,)).item()]]
+                
+                for _ in range(num_text_tokens - 1):
+                    last_text_token = selected_text[-1]
+                    distances = cosine_dist_text[last_text_token, relevant_text_indices]
+                    farthest_idx = torch.argmax(distances).item()
+                    next_text_token = relevant_text_indices[farthest_idx]
+                    # Avoid selecting already picked tokens
+                    cosine_dist_text[last_text_token, :] = -1e9
+                    cosine_dist_text[:, last_text_token] = -1e9
+                    
+                    selected_text.append(next_text_token)
             
-            flat_sampling_mask = sampling_mask[b].flatten()
-            flat_sampling_mask[drop_indices] = False
-            sampling_mask[b] = flat_sampling_mask.view(video_mask[b].shape)
-        
+            #if possible access to token ids and get the words at those indices
+            # Select m closest video tokens for each farthest text token
+            selected_video = set()
+            remaining_video_indices = video_indices.clone()
+            for text_token in selected_text:
+                if len(remaining_video_indices) == 0:
+                    break
+                video_dists = cosine_dist[text_token, remaining_video_indices]
+                num_to_select = int(m)
+                if num_to_select > len(remaining_video_indices):
+                    num_to_select = len(remaining_video_indices)
+                
+                closest_video_indices = remaining_video_indices[video_dists.topk(num_to_select, largest=False).indices]
+                for idx in closest_video_indices:
+                    # Avoid selecting already picked tokens
+                    cosine_dist[:, idx] = 1e12
+                    cosine_dist[idx, :] = 1e12
+                selected_video.update(closest_video_indices.tolist())
+                mask = torch.tensor([idx not in selected_video for idx in remaining_video_indices.tolist()], device=hidden_states.device, dtype=torch.bool)
+                remaining_video_indices = remaining_video_indices[mask]
+
+            # pdb.set_trace()
+            # Update sampling mask: zero out unselected video tokens
+            selected_video = torch.tensor(list(selected_video), device=hidden_states.device)
+            sampling_mask[b, video_indices] = False  # Mask out all video tokens initially
+            sampling_mask[b, selected_video] = True  # Retain selected video tokens
+
         hidden_states = hidden_states * sampling_mask.float()
         video_mask = video_mask & sampling_mask
+
         return hidden_states, video_mask, sampling_mask

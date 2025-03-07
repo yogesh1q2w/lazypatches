@@ -19,11 +19,22 @@ DATASET = "perceptiontest"
 ROOT_PATH = "/home/atuin/g102ea/shared/group_10/datasets"
 DATASET_PATH = os.path.join(ROOT_PATH, DATASET)
 
+LLM_FPS = float(sys.argv[1])
+RETENTION_RATE = float(sys.argv[2])
+SAMPLER_TYPE = sys.argv[3]
+DATASET = sys.argv[4]
+HYPERPARAM = float(sys.argv[5])
+DROPPING_POSITION = int(sys.argv[6])
+
+#argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
+ 
+TARGET_PATH = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
-        logging.FileHandler("evaluation.log"),  # Log to a file
+        logging.FileHandler(os.path.join(TARGET_PATH, "evaluation.log")),  # Log to a file
         logging.StreamHandler(sys.stdout),      # Log to console
     ]
 )
@@ -125,7 +136,8 @@ for step, data in enumerate(data_loader):
             "processing_time": elapsed_time  # <-- Store processing time
         })
         torch.cuda.empty_cache()
-    except:
+    except Exception as e:
+        logger.info(f'Exception thrown is {e}')
         failed_indices.append(int(idx))
         torch.cuda.empty_cache()
     
@@ -134,13 +146,13 @@ for step, data in enumerate(data_loader):
         logger.info(f"Processed {step}/{len(dataset)} - Current ACC: {current_accuracy:.4f}")
 
     if step % SAVE_EVERY == 0:
-        json.dump(results, open("results.json", "w"))
-        json.dump(failed_indices, open("failed_indices.json", "w"))
+        json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
+        json.dump(failed_indices, open(os.path.join(TARGET_PATH,"failed_indices.json"), "w"))
         print(f"saved till step {step}", file=sys.stderr)
     torch.cuda.empty_cache()
     
-json.dump(results, open("results.json", "w"))
-json.dump(failed_indices, open("failed_indices.json", "w"))
+json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
+json.dump(failed_indices, open(os.path.join(TARGET_PATH,"failed_indices.json"), "w"))
 
 
 # Calculate final metrics
