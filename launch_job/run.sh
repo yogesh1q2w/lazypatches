@@ -4,7 +4,7 @@
 #SBATCH --time=00:10:00 
 #SBATCH --job-name=run
 
-#SBATCH --output=/home/hpc/g102ea/g102ea12/lazypatches/eval.log
+#SBATCH --output=/home/hpc/g102ea/g102ea12/lazypatches/error.log
 
 #SBATCH --export=None
 
@@ -12,4 +12,4 @@ module add python
 conda activate m3project
 source .env/bin/activate
 
-python3 inference/run_sub_action.py > sub_perceptiontest_output.out
+python3 inference/run.py > test.out # add args based on test

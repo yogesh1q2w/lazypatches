@@ -30,4 +30,4 @@ mkdir -p "$output_dir"
 # --st_gaussian sampler: sbatch launch_job/run_mcq.sh 1.0 .50 st_gaussian Charades 1 0 {Dataset is Charades, Hyperparam  is 1, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
 # --km_closest sampler: sbatch launch_job/run_mcq.sh 1.0 .50 km_closest Charades 0.50 0 {Dataset is Charades, Hyperparam  is 0.5, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
 
-python3 inference/run_sub_action.py "$1" "$2" "$3" "$4" "$5" "$6"> "$output_dir/output.out" 2> "$output_dir/error.log"
+python3 inference/run_subset_mcq.py "$1" "$2" "$3" "$4" "$5" "$6"> "$output_dir/output.out" 2> "$output_dir/error.log"

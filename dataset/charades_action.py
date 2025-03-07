@@ -1,14 +1,11 @@
 """Dataset loader for the Charades dataset"""
 
 import os
-import torch
 import torch.utils.data as data
 import numpy as np
 import pandas as pd
 import json
 
-from torchvision import io
-from typing import Dict
 from tqdm import tqdm
 from inference.utils.vision_process import fetch_video
 
@@ -56,7 +53,7 @@ class CharadesActionMCQ(data.Dataset):
         reload=True,
         target_fps=2.0,
     ):
-        # give either already exisiting dataset or corresponding paths to build one
+        # give either already existing dataset or corresponding paths to build one
         if reload:
             assert videos_path is None and labels_path is None and classes_path is None and n_wrong_options is None
             self.data = json.load(open(dataset_path, "r"))

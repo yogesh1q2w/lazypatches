@@ -1,12 +1,9 @@
 import os
-import torch
 import torch.utils.data as data
 import numpy as np
 import pandas as pd
 import json
 
-from torchvision import io
-from typing import Dict
 from tqdm import tqdm
 from inference.utils.vision_process import fetch_video
 

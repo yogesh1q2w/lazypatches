@@ -5,8 +5,8 @@ import json
 from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
 
 from torch.utils.data import DataLoader
-from dataset.sub_charades_action import Sub_CharadesActionMCQ
-from dataset.sub_perceptiontest import SubPerceptiontestMCQ
+from dataset.sub_charades_action import CharadesActionMCQ
+from dataset.sub_perceptiontest import PerceptiontestMCQ
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SAVE_EVERY = 100
@@ -20,11 +20,11 @@ DATASET_PATH = os.path.join(ROOT_PATH, DATASET)
 RELOAD = True
 if DATASET == "charades":
     if RELOAD:
-        dataset = Sub_CharadesActionMCQ(
+        dataset = CharadesActionMCQ(
             dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json", reload=RELOAD
         )
     else:
-        dataset = Sub_CharadesActionMCQ(
+        dataset = CharadesActionMCQ(
             dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json",
             videos_path=os.path.join(DATASET_PATH, "videos/Charades_v1"),
             labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
@@ -34,12 +34,12 @@ if DATASET == "charades":
         )
 elif DATASET == "perceptiontest":
     if RELOAD:
-        perceptiontest_dataset = SubPerceptiontestMCQ(
+        perceptiontest_dataset = PerceptiontestMCQ(
             dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/sub_perceptiontest_mcq.json",
             reload=RELOAD,
         )
     else:
-        perceptiontest_dataset = SubPerceptiontestMCQ(
+        perceptiontest_dataset = PerceptiontestMCQ(
             dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/sub_perceptiontest_mcq.json",
             videos_path=os.path.join(DATASET_PATH, "valid/videos"),
             labels_path=os.path.join(DATASET_PATH, "valid/all_valid.json"),
