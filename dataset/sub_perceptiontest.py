@@ -6,7 +6,7 @@ import torch.utils.data as data
 from inference.utils.vision_process import fetch_video
 
 
-Prompts_pre = f"Select the best answer to the following multiple-choice question based on the video. Respond with only the letter (A, B, C, or D) of the correct option."
+Prompts_pre = f"Select the best answer to the following multiple-choice question based on the video. Respond with only the letter (A, B, or C) of the correct option."
 Prompts_suf = f"The best answer is:"
 
 num_mapping = {0: "A", 1: "B", 2: "C"}
