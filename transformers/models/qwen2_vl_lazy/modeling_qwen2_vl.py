@@ -1117,7 +1117,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         self.norm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen2VLRotaryEmbedding(config=config)
 
-        self.sampler = QWEN2_VL_SAMPLER_CLASSES[config.selector_implementation](config)
+        self.sampler = None if config.selector_implementation == "None" else QWEN2_VL_SAMPLER_CLASSES[config.selector_implementation](config)
         self.dropping_position = config.dropping_position
 
         self.gradient_checkpointing = False
@@ -1207,7 +1207,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         next_decoder_cache = None
 
         for idx, decoder_layer in enumerate(self.layers):
-            if idx == self.dropping_position and SAMPLER_TYPE is not None:
+            if idx == self.dropping_position and self.sampler is not None:
                 if video_mask.any().item():
                     hidden_states, video_mask, sampling_mask = self.sampler(
                         hidden_states, video_mask, position_ids, input_ids
@@ -1215,8 +1215,6 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                     print(
                         f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
                     )
-                else:
-                    pass
 
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
