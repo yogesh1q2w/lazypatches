@@ -29,6 +29,7 @@ DROPPING_POSITION = int(sys.argv[6])
 # argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
 
 TARGET_PATH = f"/home/atuin/g102ea/shared/group_10/results/"
+# TARGET_PATH = f"." # for debugging purposes
 
 if SAMPLER_TYPE == "None":
     TARGET_PATH = os.path.join(TARGET_PATH, "baseline")
@@ -44,6 +45,8 @@ elif DATASET == "perceptiontest":
 
 SUB_FOLDER = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
 TARGET_PATH = os.path.join(TARGET_PATH, SUB_FOLDER)
+
+# os.makedirs(TARGET_PATH, exist_ok=True) # for debugging
 
 logging.basicConfig(
     level=logging.INFO,
