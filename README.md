@@ -43,9 +43,6 @@ python3 -m venv .env
 
 ```
 source .env/bin/activate
-cd transformers
-pip install -e .
-cd ..
 pip install -e .
 ```
 Now you are ready to run inference scripts within the venv!\
@@ -60,43 +57,3 @@ In cluster, you can run (notice that cluster activates the venv too):
 ```
 sbatch launch_job/run.sh
 ```
-
-# With Apptainer
-
-## Build images
-
-For CPU usage: 
-
-```docker build -t qwen-pytorch-fast-cpu -f docker/consistency.dockerfile .```
-
-
-For GPU usage:
-
-```docker build -t qwen2-pytorch-gpu -f docker/transformers-pytorch-gpu/Dockerfile .```
-
-Check [./docker/README.md](./docker/README.md) for more details
-
-
-## Run in the container
-
-For CPU usage: 
-
-```docker run -it -v ${HOME}/lazypatches/:/home  qwen-pytorch-fast-cpu bash```
-
-
-For GPU usage:
-
-```docker_run_nvidia -v ${HOME}/lazypatches/:/home  qwen2-pytorch-gpu bash```
-
-## Get into a running container
-
-```docker exec -it <container-id> bash```
-
-
-## Converting to Apptainer
-
-```apptainer build qwen2-pytorch-gpu.sif  docker://levoz/lazypatches:qwen2-pytorch-gpu```
-
-## Run in the Apptainer
-
-```apptainer exec qwen2-pytorch-gpu.sif bash```
