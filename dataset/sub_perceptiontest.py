@@ -109,7 +109,6 @@ class SubPerceptiontestMCQ(data.Dataset):
                     mcqs.append(mcq_text)
 
                     answer_index = mcq["answer_id"]
-                    # answer_text = mcq["options"][answer_index]
                     mcq_labels.append(f"{num_mapping[answer_index]}")
 
                     mcq_areas.append(mcq["area"])

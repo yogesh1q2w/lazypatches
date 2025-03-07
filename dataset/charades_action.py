@@ -30,6 +30,40 @@ def parse_video_action_csv(filename):
     labels = list(df.apply(lambda annot: extract_details(annot), axis=1))
     return labels
 
+def extract_subset_data(filename, sampled_data):
+    df = pd.read_csv(filename)
+
+    subset_data = {}
+    num = 0
+    for _, row in df.iterrows():
+        video_id = row["id"]
+        for action, info in sampled_data.items():
+            if video_id in info["videos"]:  # Only keep selected actions
+                if video_id not in subset_data:
+                    subset_data[video_id] = {
+                        "id": video_id,
+                        "actions": [],
+                        "descriptions": row["descriptions"].split(";"),
+                        "scene": row["scene"],
+                        "objects": [] if str(row["objects"]) == "nan" else row["objects"].split(";"),
+                        "length": float(row["length"]),
+                    }
+
+                raw_actions = [action_desc.split(" ") for action_desc in str(row["actions"]).split(";")]
+
+                seen = set()  # record existed action_id
+                actions = []
+                for item in raw_actions:
+                    action_id = item[0]
+                    if action_id == action and action_id not in seen:
+                        actions.append((action_id, float(item[1]), float(item[2])))
+                        seen.add(action_id)
+
+                if actions:
+                    subset_data[video_id]["actions"].extend(actions)
+
+    return list(subset_data.values())  # Convert dictionary back to list
+
 
 def parse_action_id_mapping(filename):
     action_id_mapping = {}
@@ -51,6 +85,7 @@ class CharadesActionMCQ(data.Dataset):
         classes_path=None,
         n_wrong_options=None,
         reload=True,
+        use_subset=True,
         target_fps=2.0,
     ):
         # give either already existing dataset or corresponding paths to build one
@@ -67,8 +102,15 @@ class CharadesActionMCQ(data.Dataset):
             )
             labels = parse_video_action_csv(labels_path)
             action_id_mapping = parse_action_id_mapping(classes_path)
+            
+            if use_subset:
+                with open("/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades.json", "r") as f:
+                    subset_data = json.load(f)
 
-            mcq_data = self.prepare(labels, action_id_mapping, n_wrong_options, videos_path)
+                subset_labels = extract_subset_data(labels_path, subset_data)
+                mcq_data = self.prepare(labels, action_id_mapping, n_wrong_options, videos_path, subset_labels)
+            else:    
+                mcq_data = self.prepare(labels, action_id_mapping, n_wrong_options, videos_path)
 
             self.data = {
                 "videos_path": videos_path,
@@ -81,17 +123,21 @@ class CharadesActionMCQ(data.Dataset):
             json.dump(self.data, open(dataset_path, "w"))
         self.target_fps = target_fps
 
-    def prepare(self, labels, action_id_mapping, n_wrong_options, videos_path):
+    def prepare(self, labels, action_id_mapping, n_wrong_options, videos_path, subset_labels=None):
         question_prompt = open(
             os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils/action_mcq.txt"),
             "r",
         ).read()
 
-        def generate_questions(true_actions_ids):
+        def generate_questions(true_actions_ids, subset_true_action_ids=None):
             false_action_ids = list(set(action_id_mapping.keys()) - set(true_actions_ids))
             questions = []
             answers = []
-            for true_option_id in true_actions_ids:
+            if subset_true_action_ids == None:
+                used_actions_ids = true_actions_ids
+            else:
+                used_actions_ids = subset_true_action_ids
+            for true_option_id in used_actions_ids:
                 false_options_ids = np.random.choice(false_action_ids, size=n_wrong_options, replace=False)
                 all_options = np.append([true_option_id], false_options_ids)
                 np.random.shuffle(all_options)
@@ -109,15 +155,35 @@ class CharadesActionMCQ(data.Dataset):
         mcqs = []
         mcq_labels = []
 
-        for video_info in tqdm(labels):
+        if subset_labels == None:
+            for video_info in tqdm(labels):
 
-            video_path = f"{videos_path}/{video_info['id']}.mp4"
-            video_questions, video_answers = generate_questions([action[0] for action in video_info["actions"]])
+                video_path = f"{videos_path}/{video_info['id']}.mp4"
+                video_questions, video_answers = generate_questions([action[0] for action in video_info["actions"]])
 
-            video_paths.extend([video_path] * len(video_answers))
-            video_ids.extend([video_info["id"]] * len(video_answers))
-            mcqs.extend(video_questions)
-            mcq_labels.extend(video_answers)
+                video_paths.extend([video_path] * len(video_answers))
+                video_ids.extend([video_info["id"]] * len(video_answers))
+                mcqs.extend(video_questions)
+                mcq_labels.extend(video_answers)
+        else:
+            labels_dict = {video_info["id"]: video_info for video_info in labels}
+            for subset_video_info in tqdm(subset_labels):
+                video_id = subset_video_info["id"]
+
+                if video_id in labels_dict:  # ensure video_id also in labels
+                    video_info = labels_dict[video_id]  # get corresponding video_id
+                    video_path = f"{videos_path}/{video_id}.mp4"
+
+                    # generate MCQ, just using chosen actions
+                    video_questions, video_answers = generate_questions(
+                        [action[0] for action in video_info["actions"]],  # all true actions in video
+                        [action[0] for action in subset_video_info["actions"]],  # subset true actions in video
+                    )
+
+                video_paths.extend([video_path] * len(video_answers))
+                video_ids.extend([video_info["id"]] * len(video_answers))
+                mcqs.extend(video_questions)
+                mcq_labels.extend(video_answers)
 
         return {
             "video_paths": video_paths,
