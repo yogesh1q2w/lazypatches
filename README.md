@@ -143,7 +143,7 @@ Note: The folder chosen depends on the following logic in the bash script:
 
 If SAMPLER_TYPE is None, the results go under the baseline folder.
 
-If SAMPLER_TYPE is km_closest and HYPERPARAM is not 0.5, the results go under the ablation folder.
+If SAMPLER_TYPE is km_closest and HYPERPARAM is not 0.5, the results go under the ablations folder.
 
 If DATASET is charades, the results go under the charades folder.
 
