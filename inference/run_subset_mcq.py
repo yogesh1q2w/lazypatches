@@ -28,6 +28,7 @@ DROPPING_POSITION = int(sys.argv[6])
 # argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
 
 TARGET_PATH = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
+os.mkdir(TARGET_PATH)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -56,11 +57,11 @@ if DATASET == "charades":
         )
 elif DATASET == "perceptiontest":
     if RELOAD:
-        perceptiontest_dataset = SubPerceptiontestMCQ(
+        dataset = SubPerceptiontestMCQ(
             dataset_path=os.path.join(DATASET_PATH, "sub_perceptiontest_mcq.json"), reload=RELOAD
         )
     else:
-        perceptiontest_dataset = SubPerceptiontestMCQ(
+        dataset = SubPerceptiontestMCQ(
             dataset_path=os.path.join(DATASET_PATH, "sub_perceptiontest_mcq.json"),
             videos_path=os.path.join(DATASET_PATH, "valid/videos"),
             labels_path=os.path.join(DATASET_PATH, "valid/all_valid.json"),
@@ -88,6 +89,7 @@ for step, data in enumerate(data_loader):
         idx, video, question, answer = data
     elif DATASET == "perceptiontest":
         idx, video, question, answer, area, tag = data
+        print(area, tag)
 
     idx = idx[0]
     video = video.squeeze(0)
