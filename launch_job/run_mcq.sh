@@ -68,4 +68,4 @@ TARGET_PATH="${TARGET_PATH}/${SUB_FOLDER}"
 
 mkdir -p "$TARGET_PATH"
 
-python3 inference/run_subset_mcq.py "$1" "$2" "$3" "$4" "$5" "$6" > "$TARGET_PATH/output.out" 2> "$TARGET_PATH/error.log"
+python3 inference/run_subset_mcq.py "$1" "$2" "$3" "$4" "$5" "$6" $TARGET_PATH > "$TARGET_PATH/output.out" 2> "$TARGET_PATH/error.log"

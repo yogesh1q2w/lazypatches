@@ -16,35 +16,17 @@ SAVE_EVERY = 100
 
 MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
 
-DATASET = sys.argv[4].lower()
-ROOT_PATH = "/home/atuin/g102ea/shared/group_10/datasets"
-DATASET_PATH = os.path.join(ROOT_PATH, DATASET)
-
+# argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
 LLM_FPS = float(sys.argv[1])
 RETENTION_RATE = float(sys.argv[2])
 SAMPLER_TYPE = sys.argv[3]
+DATASET = sys.argv[4].lower()
 HYPERPARAM = float(sys.argv[5])
 DROPPING_POSITION = int(sys.argv[6])
+TARGET_PATH = sys.argv[7]
 
-# argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
-
-TARGET_PATH = f"/home/atuin/g102ea/shared/group_10/results/"
-# TARGET_PATH = f"." # for debugging
-
-if SAMPLER_TYPE == "None":
-    TARGET_PATH = os.path.join(TARGET_PATH, "baseline")
-
-elif SAMPLER_TYPE == "km_closest" and HYPERPARAM != 0.5:
-    TARGET_PATH = os.path.join(TARGET_PATH, "ablations")
-
-elif DATASET == "charades":
-    TARGET_PATH = os.path.join(TARGET_PATH, "charades")
-
-elif DATASET == "perceptiontest":
-    TARGET_PATH = os.path.join(TARGET_PATH, "perceptiontest")
-
-SUB_FOLDER = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
-TARGET_PATH = os.path.join(TARGET_PATH, SUB_FOLDER)
+ROOT_PATH = "/home/atuin/g102ea/shared/group_10/datasets"
+DATASET_PATH = os.path.join(ROOT_PATH, DATASET)
 
 # os.makedirs(TARGET_PATH, exist_ok=True) # for debugging
 
