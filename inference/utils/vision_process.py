@@ -30,7 +30,7 @@ VIDEO_MIN_PIXELS = 128 * 28 * 28
 VIDEO_MAX_PIXELS = 225 * 28 * 28
 VIDEO_TOTAL_PIXELS = 225 * 28 * 28
 FRAME_FACTOR = 2
-FPS = 2 #THIS REMAINS FIXED, ARGUMENT FPS IS FOR SECOND FETCH_VIDEO 
+FPS = 20 #THIS REMAINS FIXED, ARGUMENT FPS IS FOR SECOND FETCH_VIDEO 
 FPS_MIN_FRAMES = 4
 FPS_MAX_FRAMES = 60
 
@@ -259,7 +259,7 @@ def fetch_video(ele: dict, image_factor: int = IMAGE_FACTOR) -> torch.Tensor | l
         video = VIDEO_READER_BACKENDS[video_reader_backend](ele)
         nframes, _, height, width = video.shape
         # print(f"Original video shape = {video.shape}")
-        print(f'FPS FOR CURRENT EXPERIMENT IS {FPS}')
+        # print(f'FPS FOR CURRENT EXPERIMENT IS {FPS}')
 
         min_pixels = ele.get("min_pixels", VIDEO_MIN_PIXELS)
         total_pixels = ele.get("total_pixels", VIDEO_TOTAL_PIXELS)

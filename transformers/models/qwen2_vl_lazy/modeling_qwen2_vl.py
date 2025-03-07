@@ -68,7 +68,7 @@ _CONFIG_FOR_DOC = "Qwen2VLConfig"
 
 RETENTION_RATE = float(sys.argv[2])
 SAMPLER_TYPE = sys.argv[3]
-
+LLM_FPS = float(sys.argv[1])
 
 @dataclass
 class Qwen2VLCausalLMOutputWithPast(ModelOutput):
@@ -1124,7 +1124,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         self.rotary_emb = Qwen2VLRotaryEmbedding(config=config)
 
         self.sampler = QWEN2_VL_SAMPLER_CLASSES[config.selector_implementation](config)
-        self.selector_iter = config.selector_iter
+        self.dropping_position = config.dropping_position
 
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
@@ -1214,7 +1214,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
 
 
         for idx, decoder_layer in enumerate(self.layers):
-            if idx % self.selector_iter == 0 and SAMPLER_TYPE is not None:
+            if idx == self.dropping_position and SAMPLER_TYPE is not None:
                 if video_mask.any().item():
                     hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids, input_ids)
                     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
@@ -1679,10 +1679,10 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                     device=input_ids.device,
                     dtype=input_ids.dtype,
                 )
-            print(f'The positional ids for the input video is {position_ids}. ')
-            print(f'the shape of the posiitonal ids are : {position_ids.shape()}')
-            print(f'The mrope delta is {mrope_position_deltas}')
-            print(f'the shape of mrope position deltas is {mrope_position_deltas.shape()}')
+            # print(f'The positional ids for the input video is {position_ids}. ')
+            # print(f'the shape of the posiitonal ids are : {position_ids.shape()}')
+            # print(f'The mrope delta is {mrope_position_deltas}')
+            # print(f'the shape of mrope position deltas is {mrope_position_deltas.shape()}')
             return position_ids, mrope_position_deltas
 
     @add_start_docstrings_to_model_forward(QWEN2_VL_INPUTS_DOCSTRING)
@@ -1778,7 +1778,7 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                 video_embeds = self.visual(pixel_values_videos, grid_thw=video_grid_thw)
                 # import pdb
                 # pdb.set_trace()
-                video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw = fps_reduction(video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw, llm_fps=1, video_token_id=self.config.video_token_id)
+                video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw = fps_reduction(video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw, llm_fps=LLM_FPS, video_token_id=self.config.video_token_id)
                 n_video_tokens = (input_ids == self.config.video_token_id).sum().item()
                 n_video_features = video_embeds.shape[0]
                 if n_video_tokens != n_video_features:

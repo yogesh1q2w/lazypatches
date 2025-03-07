@@ -202,12 +202,12 @@ class Qwen2VLConfig(PretrainedConfig):
         rope_scaling=None,
         vt_sampling_strategy=None,
         vt_sampling_proportion: List[float]=None,
-        selector_iter = None,
+        dropping_position = int(sys.argv[6]),
         selector_implementation = sys.argv[3],
         retain_proportion = float(sys.argv[2]),
         temporal_variance = float(sys.argv[5]),
         spatial_variance = float(sys.argv[5]),
-        k_farthest = int(sys.argv[5]),
+        k_farthest = float(sys.argv[5]),
         **kwargs,
     ):
         if isinstance(vision_config, dict):
@@ -241,7 +241,7 @@ class Qwen2VLConfig(PretrainedConfig):
         self.vt_sampling_proportion = vt_sampling_proportion
         self.k_farthest = k_farthest
 
-        self.selector_iter = self.num_hidden_layers if selector_iter is None else selector_iter
+        self.dropping_position = dropping_position
         self.selector_implementation = selector_implementation
         self.retain_proportion = retain_proportion
         self.temporal_variance = temporal_variance

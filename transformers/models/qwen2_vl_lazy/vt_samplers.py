@@ -120,8 +120,6 @@ class KMclosestTokenSampler(Sampler):
         video_seq_len = len(video_positions[0])
         
         for b in range(batch_size):
-            m = (self.retain_proportion * video_seq_len) // self.k
-
             state_normalized = F.normalize(hidden_states[b])
             cosine_sim = torch.mm(state_normalized, state_normalized.T) #should return seq_len, seq_len
 
@@ -135,33 +133,30 @@ class KMclosestTokenSampler(Sampler):
             lower_text_bound = (input_ids[0][text_indices] == 151653).nonzero(as_tuple=True)[0].item() + 1 #User input text starts after |vision_end| token whose token id is 151653.
             upper_text_bound = lower_text_bound + (input_ids[0][text_indices][lower_text_bound:] == 151645).nonzero(as_tuple=True)[0].item() #User input ends before the first |im_end| tag after |vision_end| is encountered. Input ID of |im_end| is 151645
             
-            if(len(text_indices) < self.k):
-                raise ValueError("Hyperparameter K needs to be smaller than prompt length!!")
-
             relevant_text_indices = text_indices[lower_text_bound:upper_text_bound]
-            pdb.set_trace()
-            selected_text = []
 
-            if(len(relevant_text_indices)==self.k):
+            num_text_tokens = int(self.k * len(relevant_text_indices))
+            m = (self.retain_proportion * video_seq_len) // num_text_tokens
+
+            selected_text = []
+            cosine_dist_text = cosine_dist.clone()
+            if(len(relevant_text_indices)==num_text_tokens):
                 selected_text = relevant_text_indices
 
-            elif(self.k < len(relevant_text_indices)):
+            elif(num_text_tokens < len(relevant_text_indices)):
                 selected_text = [relevant_text_indices[torch.randint(0, len(relevant_text_indices), (1,)).item()]]
                 
-                for _ in range(self.k - 1):
+                for _ in range(num_text_tokens - 1):
                     last_text_token = selected_text[-1]
-                    distances = cosine_dist[last_text_token, relevant_text_indices]
+                    distances = cosine_dist_text[last_text_token, relevant_text_indices]
                     farthest_idx = torch.argmax(distances).item()
                     next_text_token = relevant_text_indices[farthest_idx]
                     # Avoid selecting already picked tokens
-                    cosine_dist[last_text_token, next_text_token] = -1e9
-                    cosine_dist[next_text_token, last_text_token] = -1e9
+                    cosine_dist_text[last_text_token, :] = -1e9
+                    cosine_dist_text[:, last_text_token] = -1e9
                     
                     selected_text.append(next_text_token)
-
-            else:
-                raise ValueError("Hyperparameter K needs to be smaller than prompt length!!")
-                
+            
             #if possible access to token ids and get the words at those indices
             # Select m closest video tokens for each farthest text token
             selected_video = set()
@@ -177,12 +172,13 @@ class KMclosestTokenSampler(Sampler):
                 closest_video_indices = remaining_video_indices[video_dists.topk(num_to_select, largest=False).indices]
                 for idx in closest_video_indices:
                     # Avoid selecting already picked tokens
-                    cosine_dist[text_token, idx] = -1e12
-                    cosine_dist[idx, text_token] = -1e12
+                    cosine_dist[:, idx] = 1e12
+                    cosine_dist[idx, :] = 1e12
                 selected_video.update(closest_video_indices.tolist())
                 mask = torch.tensor([idx not in selected_video for idx in remaining_video_indices.tolist()], device=hidden_states.device, dtype=torch.bool)
                 remaining_video_indices = remaining_video_indices[mask]
 
+            # pdb.set_trace()
             # Update sampling mask: zero out unselected video tokens
             selected_video = torch.tensor(list(selected_video), device=hidden_states.device)
             sampling_mask[b, video_indices] = False  # Mask out all video tokens initially

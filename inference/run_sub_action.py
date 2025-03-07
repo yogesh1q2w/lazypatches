@@ -18,13 +18,16 @@ MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qw
 ROOT_PATH = "/home/atuin/g102ea/g102ea12/dataset"
 DATASET_PATH = os.path.join(ROOT_PATH, "charades")
 
-FPS = float(sys.argv[1])
+LLM_FPS = float(sys.argv[1])
 RETENTION_RATE = float(sys.argv[2])
 SAMPLER_TYPE = sys.argv[3]
 DATASET = sys.argv[4]
-HYPERPARAM = sys.argv[5]
+HYPERPARAM = float(sys.argv[5])
+DROPPING_POSITION = int(sys.argv[6])
 
-TARGET_PATH = f"{DATASET}_{SAMPLER_TYPE}_{FPS}_{int(100-RETENTION_RATE*100)}%_{HYPERPARAM}"
+#argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
+ 
+TARGET_PATH = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
 
 logging.basicConfig(
     level=logging.INFO,

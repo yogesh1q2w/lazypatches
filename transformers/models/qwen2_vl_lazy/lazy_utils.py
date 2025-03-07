@@ -41,4 +41,6 @@ def fps_reduction(video_embeds, input_ids, inputs_embeds, attention_mask, video_
     )
     video_grid_thw[0, 0] = reduced_nframes
 
+    print(f'The effective FPS into LLM for current experiment is {llm_fps}.')
+
     return video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw
