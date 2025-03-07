@@ -637,9 +637,7 @@ def require_tensorflow_probability(test_case):
     These tests are skipped when TensorFlow probability isn't installed.
 
     """
-    return unittest.skipUnless(is_tensorflow_probability_available(), "test requires TensorFlow probability")(
-        test_case
-    )
+    return unittest.skipUnless(is_tensorflow_probability_available(), "test requires TensorFlow probability")(test_case)
 
 
 def require_torchaudio(test_case):
@@ -783,9 +781,7 @@ def require_torch_multi_accelerator(test_case):
     if not is_torch_available():
         return unittest.skip(reason="test requires PyTorch")(test_case)
 
-    return unittest.skipUnless(backend_device_count(torch_device) > 1, "test requires multiple accelerators")(
-        test_case
-    )
+    return unittest.skipUnless(backend_device_count(torch_device) > 1, "test requires multiple accelerators")(test_case)
 
 
 def require_torch_non_multi_gpu(test_case):
@@ -1004,9 +1000,7 @@ def require_torch_fp16(test_case):
 
 def require_fp8(test_case):
     """Decorator marking a test that requires supports for fp8"""
-    return unittest.skipUnless(is_accelerate_available() and is_fp8_available(), "test requires fp8 support")(
-        test_case
-    )
+    return unittest.skipUnless(is_accelerate_available() and is_fp8_available(), "test requires fp8 support")(test_case)
 
 
 def require_torch_bf16(test_case):
@@ -1798,9 +1792,7 @@ class TestCasePlus(unittest.TestCase):
 
             # to avoid nuking parts of the filesystem, only relative paths are allowed
             if not tmp_dir.startswith("./"):
-                raise ValueError(
-                    f"`tmp_dir` can only be a relative path, i.e. `./some/path`, but received `{tmp_dir}`"
-                )
+                raise ValueError(f"`tmp_dir` can only be a relative path, i.e. `./some/path`, but received `{tmp_dir}`")
 
             # ensure the dir is empty to start with
             if before is True and path.exists():

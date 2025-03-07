@@ -102,9 +102,7 @@ else:
         `tokenizers`.
         """
 
-        def __init__(
-            self, content: str, single_word=False, lstrip=False, rstrip=False, special=False, normalized=None
-        ):
+        def __init__(self, content: str, single_word=False, lstrip=False, rstrip=False, special=False, normalized=None):
             self.content = content
             self.single_word = single_word
             self.lstrip = lstrip
@@ -570,9 +568,7 @@ class BatchEncoding(UserDict):
 
         return CharSpan(*span_indices) if span_indices is not None else None
 
-    def char_to_token(
-        self, batch_or_char_index: int, char_index: Optional[int] = None, sequence_index: int = 0
-    ) -> int:
+    def char_to_token(self, batch_or_char_index: int, char_index: Optional[int] = None, sequence_index: int = 0) -> int:
         """
         Get the index of the token in the encoded output comprising a character in the original string for a sequence
         of the batch.
@@ -719,9 +715,7 @@ class BatchEncoding(UserDict):
         # Get a function reference for the correct framework
         if tensor_type == TensorType.TENSORFLOW:
             if not is_tf_available():
-                raise ImportError(
-                    "Unable to convert output to TensorFlow tensors format, TensorFlow is not installed."
-                )
+                raise ImportError("Unable to convert output to TensorFlow tensors format, TensorFlow is not installed.")
             import tensorflow as tf
 
             as_tensor = tf.constant
@@ -755,6 +749,7 @@ class BatchEncoding(UserDict):
 
             def is_tensor(obj):
                 return isinstance(obj, mx.array)
+
         else:
 
             def as_tensor(value, dtype=None):
@@ -1432,7 +1427,9 @@ class PreTrainedTokenizerBase(SpecialTokensMixin, PushToHubMixin):
         # By default, do not split special tokens for both fast and slow tokenizers
         self.split_special_tokens = kwargs.pop("split_special_tokens", False)
 
-        self.deprecation_warnings = {}  # Use to store when we have already noticed a deprecation warning (avoid overlogging).
+        self.deprecation_warnings = (
+            {}
+        )  # Use to store when we have already noticed a deprecation warning (avoid overlogging).
         self._in_target_context_manager = False
 
         # Stores a Jinja template that formats chat histories into tokenizable strings
@@ -1471,9 +1468,7 @@ class PreTrainedTokenizerBase(SpecialTokensMixin, PushToHubMixin):
                 )
             self.deprecation_warnings["max_len_single_sentence"] = True
         else:
-            raise ValueError(
-                "Setting 'max_len_single_sentence' is now deprecated. This value is automatically set up."
-            )
+            raise ValueError("Setting 'max_len_single_sentence' is now deprecated. This value is automatically set up.")
 
     @max_len_sentences_pair.setter
     def max_len_sentences_pair(self, value) -> int:
@@ -3551,9 +3546,7 @@ class PreTrainedTokenizerBase(SpecialTokensMixin, PushToHubMixin):
         if return_length:
             encoded_inputs["length"] = len(encoded_inputs["input_ids"])
 
-        batch_outputs = BatchEncoding(
-            encoded_inputs, tensor_type=return_tensors, prepend_batch_axis=prepend_batch_axis
-        )
+        batch_outputs = BatchEncoding(encoded_inputs, tensor_type=return_tensors, prepend_batch_axis=prepend_batch_axis)
 
         return batch_outputs
 

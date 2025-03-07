@@ -622,9 +622,7 @@ class EncoderDecoderModel(PreTrainedModel, GenerationMixin):
             encoder_hidden_states = self.enc_to_dec_proj(encoder_hidden_states)
 
         if (labels is not None) and (decoder_input_ids is None and decoder_inputs_embeds is None):
-            decoder_input_ids = shift_tokens_right(
-                labels, self.config.pad_token_id, self.config.decoder_start_token_id
-            )
+            decoder_input_ids = shift_tokens_right(labels, self.config.pad_token_id, self.config.decoder_start_token_id)
             if decoder_attention_mask is None:
                 decoder_attention_mask = decoder_input_ids.new_tensor(decoder_input_ids != self.config.pad_token_id)
 

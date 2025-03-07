@@ -723,9 +723,7 @@ class PushToHubMixin:
                 "instead."
             )
             if repo_id is not None:
-                raise ValueError(
-                    "`repo_id` and `repo_url` are both specified. Please set only the argument `repo_id`."
-                )
+                raise ValueError("`repo_id` and `repo_url` are both specified. Please set only the argument `repo_id`.")
             repo_id = repo_url.replace(f"{HUGGINGFACE_CO_RESOLVE_ENDPOINT}/", "")
         if organization is not None:
             warnings.warn(
@@ -930,9 +928,7 @@ class PushToHubMixin:
         repo_url = deprecated_kwargs.pop("repo_url", None)
         organization = deprecated_kwargs.pop("organization", None)
 
-        repo_id = self._create_repo(
-            repo_id, private=private, token=token, repo_url=repo_url, organization=organization
-        )
+        repo_id = self._create_repo(repo_id, private=private, token=token, repo_url=repo_url, organization=organization)
 
         # Create a new empty model card and eventually tag it
         model_card = create_and_tag_model_card(

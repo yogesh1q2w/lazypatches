@@ -11,4 +11,6 @@ env
 __pycache__/
 rough/
 *.json
+!subset_charades.json
+!subset_perceptiontest.json
 *.egg-info/

@@ -20,6 +20,7 @@
 """PyTorch Qwen2-VL model."""
 
 import math
+import sys
 from dataclasses import dataclass
 from typing import List, Optional, Tuple, Union
 
@@ -49,8 +50,9 @@ from ...utils import (
     logging,
     replace_return_docstrings,
 )
+from .lazy_utils import fps_reduction
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
-
+from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler, KMclosestTokenSampler
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -63,6 +65,10 @@ else:
 logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "Qwen2VLConfig"
+
+RETENTION_RATE = float(sys.argv[2])
+SAMPLER_TYPE = sys.argv[3]
+LLM_FPS = float(sys.argv[1])
 
 
 @dataclass
@@ -233,12 +239,8 @@ def apply_multimodal_rotary_pos_emb(q, k, cos, sin, mrope_section, unsqueeze_dim
         `tuple(torch.Tensor)` comprising of the query and key tensors rotated using the Rotary Position Embedding.
     """
     mrope_section = mrope_section * 2
-    cos = torch.cat([m[i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
-        unsqueeze_dim
-    )
-    sin = torch.cat([m[i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1).unsqueeze(
-        unsqueeze_dim
-    )
+    cos = torch.cat([m[i % 3] for i, m in enumerate(cos.split(mrope_section, dim=-1))], dim=-1).unsqueeze(unsqueeze_dim)
+    sin = torch.cat([m[i % 3] for i, m in enumerate(sin.split(mrope_section, dim=-1))], dim=-1).unsqueeze(unsqueeze_dim)
 
     q_embed = (q * cos) + (rotate_half(q) * sin)
     k_embed = (k * cos) + (rotate_half(k) * sin)
@@ -422,9 +424,7 @@ class Qwen2VLVisionBlock(nn.Module):
         self.norm2 = LayerNorm(config.embed_dim, eps=1e-6)
         mlp_hidden_dim = int(config.embed_dim * config.mlp_ratio)
 
-        self.attn = QWEN2_VL_VISION_ATTENTION_CLASSES[attn_implementation](
-            config.embed_dim, num_heads=config.num_heads
-        )
+        self.attn = QWEN2_VL_VISION_ATTENTION_CLASSES[attn_implementation](config.embed_dim, num_heads=config.num_heads)
         self.mlp = VisionMlp(dim=config.embed_dim, hidden_dim=mlp_hidden_dim, hidden_act=config.hidden_act)
 
     def forward(self, hidden_states, cu_seqlens, rotary_pos_emb) -> torch.Tensor:
@@ -538,6 +538,7 @@ class Qwen2VLAttention(nn.Module):
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
+        sampling_mask: Optional[torch.BoolTensor] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         bsz, q_len, _ = hidden_states.size()
 
@@ -548,6 +549,12 @@ class Qwen2VLAttention(nn.Module):
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+        # Apply the sampling mask to key and value states
+        if sampling_mask is not None:
+            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(-1)  # (bsz, 1, seq_len, 1)
+            key_states = key_states * sampling_mask_expanded
+            value_states = value_states * sampling_mask_expanded
 
         if position_embeddings is None:
             logger.warning_once(
@@ -562,10 +569,10 @@ class Qwen2VLAttention(nn.Module):
         query_states, key_states = apply_multimodal_rotary_pos_emb(
             query_states, key_states, cos, sin, self.rope_scaling["mrope_section"]
         )
-
-        if past_key_value is not None:
-            cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}  # Specific to RoPE models
-            key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
+        if use_cache:
+            if past_key_value is not None:
+                cache_kwargs = {"sin": sin, "cos": cos, "cache_position": cache_position}  # Specific to RoPE models
+                key_states, value_states = past_key_value.update(key_states, value_states, self.layer_idx, cache_kwargs)
 
         # repeat k/v heads if n_kv_heads < n_heads
         key_states = repeat_kv(key_states, self.num_key_value_groups)
@@ -576,6 +583,11 @@ class Qwen2VLAttention(nn.Module):
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
             attn_weights = attn_weights + causal_mask
+
+        # Apply sampling mask to attention weights
+        if sampling_mask is not None:
+            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(2)  # (bsz, 1, 1, seq_len)
+            attn_weights = attn_weights * sampling_mask_expanded
 
         # Fix precision issues in Qwen2-VL float16 inference
         # Replace inf values with zeros in attention weights to prevent NaN propagation
@@ -631,6 +643,7 @@ class Qwen2VLFlashAttention2(Qwen2VLAttention):
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
+        sampling_mask: Optional[torch.BoolTensor] = None,
     ):
         bsz, q_len, _ = hidden_states.size()
 
@@ -641,6 +654,17 @@ class Qwen2VLFlashAttention2(Qwen2VLAttention):
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+        # Apply the sampling mask to key and value states
+        if sampling_mask is not None:
+            sampling_mask_expanded = sampling_mask.unsqueeze(1).unsqueeze(-1)  # (bsz, 1, seq_len, 1)
+            key_states = key_states * sampling_mask_expanded
+            value_states = value_states * sampling_mask_expanded
+
+        if attention_mask is not None and sampling_mask is not None:
+            # Ensure the attention mask is compatible with the sampling mask
+            # Sampling mask is of shape (bsz, seq_len), attention mask is typically (bsz, 1, seq_len, seq_len)
+            attention_mask = attention_mask * sampling_mask.unsqueeze(2).unsqueeze(3)  # Mask out sampled tokens
 
         # Because the input can be padded, the absolute sequence length depends on the max position id.
         if position_embeddings is None:
@@ -743,6 +767,7 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         use_cache: bool = False,
         cache_position: Optional[torch.LongTensor] = None,
         position_embeddings: Optional[Tuple[torch.Tensor, torch.Tensor]] = None,  # will become mandatory in v4.46
+        sampling_mask: Optional[torch.BoolTensor] = None,
     ) -> Tuple[torch.Tensor, Optional[torch.Tensor], Optional[Tuple[torch.Tensor]]]:
         if output_attentions:
             # TODO: Improve this warning with e.g. `model.config.attn_implementation = "manual"` once this is implemented.
@@ -761,7 +786,6 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
             )
 
         bsz, q_len, _ = hidden_states.size()
-
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
@@ -769,6 +793,22 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
+
+        # # Apply the sampling mask to key and value states
+        # if sampling_mask is not None:
+        #     # divide embeddding space into number of heads  -> since key states embedding is divided by num_heads, we need to divide the mask into similar way as well
+        #     bsz, seq_len, embed_dim = sampling_mask.shape
+        #     assert embed_dim % self.num_heads == 0, "Embedding dimension must be divisible by the number of heads"
+        #     head_dim = embed_dim // self.num_heads  # Calculate head_dim
+
+        #     # Reshape sampling_mask to split embed_dim into num_key_value_heads per num_key_value_groups and head_dim (due to Grouped Query Attention mechanism https://arxiv.org/pdf/2305.13245)
+        #     sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads, self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
+        #     #for masking key value states, taking average across groups and thresholding the average float to get boolean mask
+        #     sampling_mask_mean = torch.mean(sampling_mask.float(), dim=2)  # [bsz, num_heads, seq_len, head_dim]
+        #     sampling_mask_mean = sampling_mask_mean >= 0.5
+        #     # Apply the sampling mask to key_states and value_states
+        #     key_states = key_states * sampling_mask_mean
+        #     value_states = value_states * sampling_mask_mean
 
         if position_embeddings is None:
             logger.warning_once(
@@ -816,6 +856,12 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
             is_causal=is_causal,
         )
 
+        # # Apply sampling mask to attention weights
+        # if sampling_mask is not None:
+        #     #reshaping sampling_mask to [bsz, num_heads, seq_len, embed_dim]
+        #     sampling_mask = sampling_mask.view(bsz, self.num_key_value_heads * self.num_key_value_groups, seq_len, head_dim)  # [bsz, seq_len, num_heads, head_dim]
+        #     attn_output = attn_output * sampling_mask
+
         attn_output = attn_output.transpose(1, 2).contiguous()
         attn_output = attn_output.view(bsz, q_len, self.hidden_size)
 
@@ -828,6 +874,12 @@ QWEN2_VL_ATTENTION_CLASSES = {
     "eager": Qwen2VLAttention,
     "flash_attention_2": Qwen2VLFlashAttention2,
     "sdpa": Qwen2VLSdpaAttention,
+}
+
+QWEN2_VL_SAMPLER_CLASSES = {
+    "uniform": UniformSampler,
+    "st_gaussian": SpatioTemporalHeuristicSampler,
+    "km_closest": KMclosestTokenSampler,
 }
 
 
@@ -852,6 +904,7 @@ class Qwen2VLDecoderLayer(nn.Module):
         hidden_states: torch.Tensor,
         attention_mask: Optional[torch.Tensor] = None,
         position_ids: Optional[torch.LongTensor] = None,
+        sampling_mask: Optional[torch.Tensor] = None,
         past_key_value: Optional[Tuple[torch.Tensor]] = None,
         output_attentions: Optional[bool] = False,
         use_cache: Optional[bool] = False,
@@ -895,6 +948,7 @@ class Qwen2VLDecoderLayer(nn.Module):
             use_cache=use_cache,
             cache_position=cache_position,
             position_embeddings=position_embeddings,
+            sampling_mask=sampling_mask,
         )
         hidden_states = residual + hidden_states
 
@@ -1050,7 +1104,7 @@ class Qwen2VisionTransformerPretrainedModel(Qwen2VLPreTrainedModel):
     QWEN2VL_START_DOCSTRING,
 )
 class Qwen2VLModel(Qwen2VLPreTrainedModel):
-    def __init__(self, config: Qwen2VLConfig):
+    def __init__(self, config: Qwen2VLConfig(selector_implementation=SAMPLER_TYPE, retain_proportion=RETENTION_RATE)):
         super().__init__(config)
         self.padding_idx = config.pad_token_id
         self.vocab_size = config.vocab_size
@@ -1062,6 +1116,9 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         self._attn_implementation = config._attn_implementation
         self.norm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen2VLRotaryEmbedding(config=config)
+
+        self.sampler = None if config.selector_implementation == "None" else QWEN2_VL_SAMPLER_CLASSES[config.selector_implementation](config)
+        self.dropping_position = config.dropping_position
 
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
@@ -1080,6 +1137,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         position_ids: Optional[torch.LongTensor] = None,
         past_key_values: Optional[List[torch.FloatTensor]] = None,
         inputs_embeds: Optional[torch.FloatTensor] = None,
+        video_mask: Optional[torch.FloatTensor] = None,
         use_cache: Optional[bool] = None,
         output_attentions: Optional[bool] = None,
         output_hidden_states: Optional[bool] = None,
@@ -1094,8 +1152,9 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
 
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
 
-        if (input_ids is None) ^ (inputs_embeds is not None):
-            raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
+        # commented by team-lazy to propagate input ids
+        # if (input_ids is None) ^ (inputs_embeds is not None):
+        #     raise ValueError("You must specify exactly one of input_ids or inputs_embeds")
 
         if self.gradient_checkpointing and self.training:
             if use_cache:
@@ -1110,6 +1169,16 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
 
         if inputs_embeds is None:
             inputs_embeds = self.embed_tokens(input_ids)
+
+        if (
+            video_mask is None or not video_mask.any().item()
+        ):  # in case of img only i/p, video mask shall be none and then it will be false entirely, but for video's successive inputs it won't return complete false tensors
+            video_mask = (
+                (input_ids == self.config.video_token_id)
+                .unsqueeze(-1)
+                .expand_as(inputs_embeds)
+                .to(inputs_embeds.device)
+            )
 
         if cache_position is None:
             past_seen_tokens = past_key_values.get_seq_length() if past_key_values is not None else 0
@@ -1128,7 +1197,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         )
 
         hidden_states = inputs_embeds
-
+        sampling_mask = None
         # create position embeddings to be shared across the decoder layers
         position_embeddings = self.rotary_emb(hidden_states, position_ids)
 
@@ -1137,7 +1206,16 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         all_self_attns = () if output_attentions else None
         next_decoder_cache = None
 
-        for decoder_layer in self.layers:
+        for idx, decoder_layer in enumerate(self.layers):
+            if idx == self.dropping_position and self.sampler is not None:
+                if video_mask.any().item():
+                    hidden_states, video_mask, sampling_mask = self.sampler(
+                        hidden_states, video_mask, position_ids, input_ids
+                    )
+                    print(
+                        f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
+                    )
+
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 
@@ -1158,6 +1236,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                     hidden_states,
                     attention_mask=causal_mask,
                     position_ids=position_ids,
+                    sampling_mask=sampling_mask,
                     past_key_value=past_key_values,
                     output_attentions=output_attentions,
                     use_cache=use_cache,
@@ -1276,7 +1355,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         device: torch.device,
         cache_position: torch.Tensor,
         batch_size: int,
-        config: Qwen2VLConfig,
+        config: Qwen2VLConfig(selector_implementation=SAMPLER_TYPE, retain_proportion=RETENTION_RATE),
         past_key_values: Cache,
     ):
         """
@@ -1308,9 +1387,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
             causal_mask = attention_mask
         else:
             min_dtype = torch.finfo(dtype).min
-            causal_mask = torch.full(
-                (sequence_length, target_length), fill_value=min_dtype, dtype=dtype, device=device
-            )
+            causal_mask = torch.full((sequence_length, target_length), fill_value=min_dtype, dtype=dtype, device=device)
             diagonal_attend_mask = torch.arange(target_length, device=device) > cache_position.reshape(-1, 1)
             if config.sliding_window is not None:
                 # if we have sliding window, we should not attend to tokens beyond sliding window length, so we mask them out also
@@ -1570,6 +1647,7 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                 position_ids[..., i, attention_mask[i] == 1] = llm_positions.to(position_ids.device)
                 mrope_position_deltas.append(llm_positions.max() + 1 - len(total_input_ids[i]))
             mrope_position_deltas = torch.tensor(mrope_position_deltas, device=input_ids.device).unsqueeze(1)
+
             return position_ids, mrope_position_deltas
         else:
             if attention_mask is not None:
@@ -1658,6 +1736,7 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
             output_hidden_states if output_hidden_states is not None else self.config.output_hidden_states
         )
         return_dict = return_dict if return_dict is not None else self.config.use_return_dict
+        video_mask = None
 
         if inputs_embeds is None:
             inputs_embeds = self.model.embed_tokens(input_ids)
@@ -1682,6 +1761,15 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
             if pixel_values_videos is not None:
                 pixel_values_videos = pixel_values_videos.type(self.visual.get_dtype())
                 video_embeds = self.visual(pixel_values_videos, grid_thw=video_grid_thw)
+                video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw = fps_reduction(
+                    video_embeds,
+                    input_ids,
+                    inputs_embeds,
+                    attention_mask,
+                    video_grid_thw,
+                    llm_fps=LLM_FPS,
+                    video_token_id=self.config.video_token_id,
+                )
                 n_video_tokens = (input_ids == self.config.video_token_id).sum().item()
                 n_video_features = video_embeds.shape[0]
                 if n_video_tokens != n_video_features:
@@ -1720,11 +1808,12 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
                 position_ids = position_ids.unsqueeze(0).expand(3, -1, -1)
 
         outputs = self.model(
-            input_ids=None,
+            input_ids=input_ids,
             position_ids=position_ids,
             attention_mask=attention_mask,
             past_key_values=past_key_values,
             inputs_embeds=inputs_embeds,
+            video_mask=video_mask,
             use_cache=use_cache,
             output_attentions=output_attentions,
             output_hidden_states=output_hidden_states,

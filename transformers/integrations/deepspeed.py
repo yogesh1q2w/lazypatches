@@ -354,9 +354,7 @@ def deepspeed_optim_sched(trainer, hf_deepspeed_config, args, num_training_steps
                 # at the time _lr_scheduler_callable is called, trainer.lr_scheduler has been set
                 # update it to None so that we can re-create a new scheduler
                 trainer_copy.lr_scheduler = None
-                lr_scheduler = trainer_copy.create_scheduler(
-                    num_training_steps=num_training_steps, optimizer=optimizer
-                )
+                lr_scheduler = trainer_copy.create_scheduler(num_training_steps=num_training_steps, optimizer=optimizer)
                 return lr_scheduler
 
             lr_scheduler = DummyScheduler(optimizer, lr_scheduler_callable=_lr_scheduler_callable)

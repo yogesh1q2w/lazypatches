@@ -1694,9 +1694,7 @@ class AutoModelForSemanticSegmentation(_BaseAutoModelClass):
     _model_mapping = MODEL_FOR_SEMANTIC_SEGMENTATION_MAPPING
 
 
-AutoModelForSemanticSegmentation = auto_class_update(
-    AutoModelForSemanticSegmentation, head_doc="semantic segmentation"
-)
+AutoModelForSemanticSegmentation = auto_class_update(AutoModelForSemanticSegmentation, head_doc="semantic segmentation")
 
 
 class AutoModelForUniversalSegmentation(_BaseAutoModelClass):
@@ -1712,9 +1710,7 @@ class AutoModelForInstanceSegmentation(_BaseAutoModelClass):
     _model_mapping = MODEL_FOR_INSTANCE_SEGMENTATION_MAPPING
 
 
-AutoModelForInstanceSegmentation = auto_class_update(
-    AutoModelForInstanceSegmentation, head_doc="instance segmentation"
-)
+AutoModelForInstanceSegmentation = auto_class_update(AutoModelForInstanceSegmentation, head_doc="instance segmentation")
 
 
 class AutoModelForObjectDetection(_BaseAutoModelClass):

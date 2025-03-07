@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Qwen2VL model configuration"""
-
+from typing import List
+import sys
 from ...configuration_utils import PretrainedConfig
 from ...modeling_rope_utils import rope_config_validation
 from ...utils import logging
@@ -147,6 +148,38 @@ class Qwen2VLConfig(PretrainedConfig):
                 `high_freq_factor` (`float`, *optional*):
                     Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
 
+        selector_implementation (`str`, defaults to cmd line argument[3]):
+            Technique to use for uni-layer sampling during Visual token selection in LLM. If 'None', the model will use all the tokens (no subsampling).
+            Expected contents:
+               `None`: No subsampling is used
+               `uniform`: Uniform sampling is used, need to specify sampled proportion.
+               `st_gaussian`: Gaussian at center heuristic sampling is used along temporal and spatial dimension, need to specify variance. (Assumption: Spatial_Variance = Temporal_Variance)
+               `km_closest`: k-farthest text tokens select m-closest video tokens to subsample k*m
+
+        retain_proportion (`float`, defaults to cmd line argument[2]):
+            Proportion of visual tokens to be retained by unilayer sampler.
+            If `selector_implementation` is not None, this should have non-zero value in (0.0, 1.0).
+            If `selector_implementation` is `None`, this value is ignored.
+
+        dropping_position (`int`, defaults to cmd line argument[6]):
+            Position(#Layer) in LLM model where visual token sampling is implemented.
+            If `selector_implementation` is not None, this should have values in [0, num_hidden_layers).
+
+        temporal_variance (`float`, defaults to cmd line argument[5]):
+            Variance for `st_gaussian` visual token selector along temporal dimension.
+            If `selector_implementation` is `st_gaussian`, this should have non-zero value.
+
+        spatial_variance (`float`, defaults to cmd line argument[5]):
+            Variance for `st_gaussian` visual token selector along spatial dimension.
+            If `selector_implementation` is `st_gaussian`, this should have non-zero value.
+
+            (*For experimental convenience, we assume temporal_variance = spatial_variance*)
+
+        k_farthest (`float`, defaults to cmd line argument[5]):
+            k_farthest corresponds to proportion of text sequence(user prompt) to be considered for nearest video token selection.
+            If `selector_implementation` is `km_closest`, this should have non-zero value in (0.0, 1.0].
+
+
     ```python
     >>> from transformers import Qwen2VLForConditionalGeneration, Qwen2VLConfig
 
@@ -185,6 +218,12 @@ class Qwen2VLConfig(PretrainedConfig):
         attention_dropout=0.0,
         vision_config=None,
         rope_scaling=None,
+        dropping_position=int(sys.argv[6]),
+        selector_implementation=sys.argv[3],
+        retain_proportion=float(sys.argv[2]),
+        temporal_variance=float(sys.argv[5]),
+        spatial_variance=float(sys.argv[5]),
+        k_farthest=float(sys.argv[5]),
         **kwargs,
     ):
         if isinstance(vision_config, dict):
@@ -214,6 +253,13 @@ class Qwen2VLConfig(PretrainedConfig):
         self.rope_theta = rope_theta
         self.attention_dropout = attention_dropout
         self.rope_scaling = rope_scaling
+
+        self.dropping_position = dropping_position
+        self.selector_implementation = selector_implementation
+        self.retain_proportion = retain_proportion
+        self.temporal_variance = temporal_variance
+        self.spatial_variance = spatial_variance
+        self.k_farthest = k_farthest
 
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, move it to 'rope_type'.

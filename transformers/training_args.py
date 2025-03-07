@@ -1320,9 +1320,7 @@ class TrainingArguments:
             )
         },
     )
-    dataloader_pin_memory: bool = field(
-        default=True, metadata={"help": "Whether or not to pin memory for DataLoader."}
-    )
+    dataloader_pin_memory: bool = field(default=True, metadata={"help": "Whether or not to pin memory for DataLoader."})
     dataloader_persistent_workers: bool = field(
         default=False,
         metadata={
@@ -1362,9 +1360,7 @@ class TrainingArguments:
     )
     gradient_checkpointing: bool = field(
         default=False,
-        metadata={
-            "help": "If True, use gradient checkpointing to save memory at the expense of slower backward pass."
-        },
+        metadata={"help": "If True, use gradient checkpointing to save memory at the expense of slower backward pass."},
     )
     gradient_checkpointing_kwargs: Optional[Union[dict, str]] = field(
         default=None,
@@ -1457,9 +1453,7 @@ class TrainingArguments:
     )
     ddp_timeout: Optional[int] = field(
         default=1800,
-        metadata={
-            "help": "Overrides the default timeout for distributed training (value should be given in seconds)."
-        },
+        metadata={"help": "Overrides the default timeout for distributed training (value should be given in seconds)."},
     )
     torch_compile: bool = field(
         default=False, metadata={"help": "If set to `True`, the model will be wrapped in `torch.compile`."}
@@ -1894,9 +1888,7 @@ class TrainingArguments:
         elif FSDPOption.FULL_SHARD in self.fsdp and FSDPOption.SHARD_GRAD_OP in self.fsdp:
             raise ValueError("`--fsdp full_shard` is not compatible with `--fsdp shard_grad_op`.")
 
-        if self.gradient_checkpointing and (
-            FSDPOption.FULL_SHARD in self.fsdp or FSDPOption.HYBRID_SHARD in self.fsdp
-        ):
+        if self.gradient_checkpointing and (FSDPOption.FULL_SHARD in self.fsdp or FSDPOption.HYBRID_SHARD in self.fsdp):
             logger.warning(
                 "When using FSDP full shard, instead of using `gradient_checkpointing` in TrainingArguments, please"
                 " use `activation_checkpointing` in `fsdp_config`. The former introduces a redundant AllGather"
@@ -2338,9 +2330,9 @@ class TrainingArguments:
             return ParallelMode.SAGEMAKER_MODEL_PARALLEL
         elif is_sagemaker_dp_enabled():
             return ParallelMode.SAGEMAKER_DATA_PARALLEL
-        elif (
-            self.distributed_state is not None and self.distributed_state.distributed_type != DistributedType.NO
-        ) or (self.distributed_state is None and self.local_rank != -1):
+        elif (self.distributed_state is not None and self.distributed_state.distributed_type != DistributedType.NO) or (
+            self.distributed_state is None and self.local_rank != -1
+        ):
             return ParallelMode.DISTRIBUTED
         elif self.n_gpu > 1:
             return ParallelMode.NOT_DISTRIBUTED
@@ -2503,9 +2495,7 @@ class TrainingArguments:
         """
         Get number of steps used for a linear warmup.
         """
-        warmup_steps = (
-            self.warmup_steps if self.warmup_steps > 0 else math.ceil(num_training_steps * self.warmup_ratio)
-        )
+        warmup_steps = self.warmup_steps if self.warmup_steps > 0 else math.ceil(num_training_steps * self.warmup_ratio)
         return warmup_steps
 
     def _dict_torch_dtype_to_str(self, d: Dict[str, Any]) -> None:

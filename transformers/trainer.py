@@ -524,9 +524,7 @@ class Trainer:
                     # Patch the model with liger kernels. Use the default kernel configurations.
                     _apply_liger_kernel_to_instance(model=model)
                 else:
-                    logger.warning(
-                        "The model is not an instance of PreTrainedModel. No liger kernels will be applied."
-                    )
+                    logger.warning("The model is not an instance of PreTrainedModel. No liger kernels will be applied.")
             else:
                 raise ImportError(
                     "You have set `use_liger_kernel` to `True` but liger-kernel >= 0.3.0 is not available. "
@@ -619,9 +617,7 @@ class Trainer:
         # Just in case the model was wrapped outside of the `Trainer`
         unwrapped_model = self.accelerator.unwrap_model(model)
         model_forward = (
-            unwrapped_model.forward
-            if not _is_peft_model(unwrapped_model)
-            else unwrapped_model.get_base_model().forward
+            unwrapped_model.forward if not _is_peft_model(unwrapped_model) else unwrapped_model.get_base_model().forward
         )
         forward_params = inspect.signature(model_forward).parameters
         self.model_accepts_loss_kwargs = (
@@ -965,9 +961,7 @@ class Trainer:
                 )
             else:
                 lengths = None
-            model_input_name = (
-                self.processing_class.model_input_names[0] if self.processing_class is not None else None
-            )
+            model_input_name = self.processing_class.model_input_names[0] if self.processing_class is not None else None
             return LengthGroupedSampler(
                 self.args.train_batch_size * self.args.gradient_accumulation_steps,
                 dataset=self.train_dataset,
@@ -1082,9 +1076,7 @@ class Trainer:
         eval_dataset = (
             self.eval_dataset[eval_dataset]
             if isinstance(eval_dataset, str)
-            else eval_dataset
-            if eval_dataset is not None
-            else self.eval_dataset
+            else eval_dataset if eval_dataset is not None else self.eval_dataset
         )
         data_collator = self.data_collator
 
@@ -2037,9 +2029,7 @@ class Trainer:
 
             xm.optimizer_step = patched_optimizer_step
         elif is_sagemaker_dp_enabled():
-            model = nn.parallel.DistributedDataParallel(
-                model, device_ids=[int(os.getenv("SMDATAPARALLEL_LOCAL_RANK"))]
-            )
+            model = nn.parallel.DistributedDataParallel(model, device_ids=[int(os.getenv("SMDATAPARALLEL_LOCAL_RANK"))])
         elif self.args.parallel_mode == ParallelMode.DISTRIBUTED:
             if is_torch_neuroncore_available():
                 return model
@@ -2493,9 +2483,7 @@ class Trainer:
                         else:
                             input_tokens = inputs[main_input_name].numel()
                             input_tokens = torch.tensor(input_tokens, device=self.args.device, dtype=torch.int64)
-                            self.state.num_input_tokens_seen += (
-                                self.accelerator.gather(input_tokens).sum().cpu().item()
-                            )
+                            self.state.num_input_tokens_seen += self.accelerator.gather(input_tokens).sum().cpu().item()
                     if rng_to_sync:
                         self._load_rng_state(resume_from_checkpoint)
                         rng_to_sync = False
@@ -2996,9 +2984,7 @@ class Trainer:
             else:
                 logger.warning(f"There were missing keys in the checkpoint model loaded: {load_result.missing_keys}.")
         if len(load_result.unexpected_keys) != 0:
-            logger.warning(
-                f"There were unexpected keys in the checkpoint model loaded: {load_result.unexpected_keys}."
-            )
+            logger.warning(f"There were unexpected keys in the checkpoint model loaded: {load_result.unexpected_keys}.")
 
     def _evaluate(self, trial, ignore_keys_for_eval, skip_scheduler=False):
         metrics = self.evaluate(ignore_keys=ignore_keys_for_eval)
@@ -3907,9 +3893,7 @@ class Trainer:
                 else:
                     torch.save(state_dict, os.path.join(output_dir, WEIGHTS_NAME))
         else:
-            self.model.save_pretrained(
-                output_dir, state_dict=state_dict, safe_serialization=self.args.save_safetensors
-            )
+            self.model.save_pretrained(output_dir, state_dict=state_dict, safe_serialization=self.args.save_safetensors)
 
         if self.processing_class is not None:
             self.processing_class.save_pretrained(output_dir)

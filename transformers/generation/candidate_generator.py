@@ -303,8 +303,8 @@ class AssistedCandidateGenerator(CandidateGenerator):
             if excess_length > 0:
                 del self.probs[-excess_length:]
 
-            if (
-                len(self.probs) > 5 and {0, 1}.issubset(self.matches)
+            if len(self.probs) > 5 and {0, 1}.issubset(
+                self.matches
             ):  # require at least 5 samples to calculate the ROC curve and at least one positive and one negative sample
                 fpr, tpr, thresholds = roc_curve(self.matches, self.probs)
                 fnr = 1 - tpr
@@ -455,9 +455,7 @@ class AssistedCandidateGeneratorDifferentTokenizers(AssistedCandidateGenerator):
         discrepancy_with_old = longest_location[1] + longest_diag_length
         discrepancy_length = (prompt.shape[1] - discrepancy_with_old).item()
         new_tokens_only = prompt_plus_new_tokens[:, new_token_start_index + discrepancy_length :]
-        discrepancy_only = prompt_plus_new_tokens[
-            :, new_token_start_index : new_token_start_index + discrepancy_length
-        ]
+        discrepancy_only = prompt_plus_new_tokens[:, new_token_start_index : new_token_start_index + discrepancy_length]
         return discrepancy_length, new_tokens_only, discrepancy_only
 
     def convert_source_tokens_to_target_tokens(

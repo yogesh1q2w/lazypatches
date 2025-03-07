@@ -999,10 +999,7 @@ class HFTracer(Tracer):
         elif "inputs_embeds" in input_name:
             batch_size = shape[0]
 
-            if (
-                getattr(model.config, "embedding_size", None) is not None
-                and model.config.model_type != "megatron-bert"
-            ):
+            if getattr(model.config, "embedding_size", None) is not None and model.config.model_type != "megatron-bert":
                 embedding_size = model.config.embedding_size
             else:
                 embedding_size = model.config.hidden_size

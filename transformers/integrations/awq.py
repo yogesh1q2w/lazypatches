@@ -281,9 +281,7 @@ def fuse_awq_modules(model, quantization_config):
             logger.info("The IPEX version AWQ does not support fuse mlp for now.")
 
         # Replace attention layers
-        attention_has_been_fused = _fuse_awq_attention_layers(
-            model, module, modules_to_fuse, name, QuantAttentionFused
-        )
+        attention_has_been_fused = _fuse_awq_attention_layers(model, module, modules_to_fuse, name, QuantAttentionFused)
 
         if attention_has_been_fused:
             fused_attention_modules.append(name.split(".")[0])
@@ -293,9 +291,7 @@ def fuse_awq_modules(model, quantization_config):
     # by the `AttentionMaskConverter` module.
     if len(fused_attention_modules) > 0:
         for module_name, module in model.named_modules():
-            if any(
-                module_name in fused_attention_modules for fused_attention_parent_module in fused_attention_modules
-            ):
+            if any(module_name in fused_attention_modules for fused_attention_parent_module in fused_attention_modules):
                 if hasattr(module, "config") and hasattr(module.config, "_attn_implementation"):
                     module.config._attn_implementation = "custom"
     return model
