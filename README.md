@@ -4,7 +4,7 @@ A spatio-temporal video subsampling strategy for efficient video-language modell
 
 # Installation with conda (for development)
 
-## Load python module
+### Load python module
 Always have to load python as:
 ```
 module load python
@@ -20,26 +20,26 @@ conda config --add pkgs_dirs $WORK/software/private/conda/pkgs
 conda config --add envs_dirs $WORK/software/private/conda/envs
 ```
 
-## Create conda environment (one time only)
+### Create conda environment (one time only)
 
 ```
 conda create -n m3project python=3.10.12
 ```
 
-## Activate conda environment (everytime)
+### Activate conda environment (everytime)
 
 ```
 conda activate m3project
 ```
 
-## Create a python virtual environment (one time only)
+### Create a python virtual environment (one time only)
 
 ```
 pip install --upgrade pip
 python3 -m venv .env
 ```
 
-## Install all requirements in python venv
+### Install all requirements in python venv
 
 ```
 source .env/bin/activate
@@ -58,32 +58,32 @@ In cluster, you can run (notice that cluster activates the venv too):
 sbatch launch_job/run.sh
 ```
 
-## For complete experiments on subset of Charades and PerceptionTest:
+# For complete experiments on subset of Charades and PerceptionTest:
 
-## Command-Line Arguments
+### Command-Line Arguments
 
 The script accepts the following arguments (in order):
 
-### LLM_FPS:
+##### LLM_FPS:
 Frame rate for the model (e.g. 1.0)
-### RETENTION_RATE:
+##### RETENTION_RATE:
 Retention rate for the video processor (e.g. 0.50)
-### SAMPLER_TYPE:
+##### SAMPLER_TYPE:
 Sampler type (e.g. uniform, st_gaussian, km_closest, or None for baseline)
-### DATASET:
+##### DATASET:
 Dataset name (e.g. Charades or PerceptionTest)
-### HYPERPARAM:
+##### HYPERPARAM:
 Hyperparameter value (e.g. 0.50 for km_closest, or 0 for uniform sampler)
-### DROPPING_POSITION:
+##### DROPPING_POSITION:
 Dropping position (e.g. 0, 12, or 24)
 
-## Execution Command Format
+### Execution Command Format
 
 ```
 sbatch launch_job/run_mcq.sh [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAMETER] [DROPPING_POSITION]
 ```
 
-## Example Command
+### Example Command
 For example, to run the script using the 'km_closest' sampler on the Charades dataset with the following settings:
 
 LLM_FPS: 1.0
@@ -98,7 +98,7 @@ Use the command:
 sbatch launch_job/run_mcq.sh 1.0 0.50 km_closest Charades 0.50 0
 ```
 
-## Results Directory Structure
+### Results Directory Structure
 
 The results are stored under a base directory:
 ```
