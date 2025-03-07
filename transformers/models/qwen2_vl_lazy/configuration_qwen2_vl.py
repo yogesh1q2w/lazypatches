@@ -207,7 +207,7 @@ class Qwen2VLConfig(PretrainedConfig):
         retain_proportion = float(sys.argv[2]),
         temporal_variance = float(sys.argv[5]),
         spatial_variance = float(sys.argv[5]),
-        k_farthest = float(sys.argv[5]),
+        k_farthest = int(sys.argv[5]),
         **kwargs,
     ):
         if isinstance(vision_config, dict):

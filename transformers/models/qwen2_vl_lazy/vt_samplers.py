@@ -13,8 +13,8 @@ class Sampler(abc.ABC):
     def sample(self, hidden_states):
         pass
 
-    def __call__(self, hidden_states, video_mask, position_ids):
-        return self.sample(hidden_states, video_mask, position_ids)
+    def __call__(self, hidden_states, video_mask, position_ids, input_ids):
+        return self.sample(hidden_states, video_mask, position_ids, input_ids)
     
 
 class UniformSampler(Sampler):
@@ -23,7 +23,7 @@ class UniformSampler(Sampler):
         self.retain_proportion = config.retain_proportion
     
     
-    def sample(self, hidden_states, video_mask, position_ids):
+    def sample(self, hidden_states, video_mask, position_ids, input_ids):
         batch_size, seq_len, embed_dim = hidden_states.shape
 
         # Initialize sampling_mask with the same dimensions as video_mask
@@ -61,7 +61,7 @@ class SpatioTemporalHeuristicSampler(Sampler):
         self.temporal_variance = config.temporal_variance
         self.spatial_variance = config.spatial_variance
     
-    def sample(self, hidden_states, video_mask, position_ids):
+    def sample(self, hidden_states, video_mask, position_ids, input_ids):
         batch_size, seq_len, d = hidden_states.shape
         video_positions = position_ids[:, video_mask.sum(axis=-1)>0]
         
@@ -113,7 +113,7 @@ class KMclosestTokenSampler(Sampler):
         self.k = config.k_farthest
         self.retain_proportion = config.retain_proportion
 
-    def sample(self, hidden_states, video_mask, position_ids):
+    def sample(self, hidden_states, video_mask, position_ids, input_ids):
         batch_size, seq_len, d = hidden_states.shape
         video_positions = position_ids[:, video_mask.sum(axis=-1)>0]
         sampling_mask =  torch.ones_like(video_mask, dtype=torch.bool)
@@ -132,13 +132,14 @@ class KMclosestTokenSampler(Sampler):
             
             text_indices = (video_mask[b] == 0).nonzero(as_tuple=True)[0].unique()
             video_indices = (video_mask[b] == 1).nonzero(as_tuple=True)[0].unique()
-            lower_text_bound = int((text_indices == max(video_indices) + 1).nonzero(as_tuple=True)[0][0])
-
+            lower_text_bound = (input_ids[0][text_indices] == 151653).nonzero(as_tuple=True)[0].item() + 1 #User input text starts after |vision_end| token whose token id is 151653.
+            upper_text_bound = lower_text_bound + (input_ids[0][text_indices][lower_text_bound:] == 151645).nonzero(as_tuple=True)[0].item() #User input ends before the first |im_end| tag after |vision_end| is encountered. Input ID of |im_end| is 151645
+            
             if(len(text_indices) < self.k):
                 raise ValueError("Hyperparameter K needs to be smaller than prompt length!!")
 
-            relevant_text_indices = text_indices[lower_text_bound:]
-
+            relevant_text_indices = text_indices[lower_text_bound:upper_text_bound]
+            pdb.set_trace()
             selected_text = []
 
             if(len(relevant_text_indices)==self.k):

@@ -1216,7 +1216,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             if idx % self.selector_iter == 0 and SAMPLER_TYPE is not None:
                 if video_mask.any().item():
-                    hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids)
+                    hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids, input_ids)
                     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
                     # import pdb; pdb.set_trace()
                 else:
