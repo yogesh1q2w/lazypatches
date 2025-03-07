@@ -34,7 +34,7 @@ if SAMPLER_TYPE == "None":
     TARGET_PATH = os.path.join(TARGET_PATH, "baseline")
 
 elif SAMPLER_TYPE == "km_closest" and HYPERPARAM != 0.5:
-    TARGET_PATH = os.path.join(TARGET_PATH, "ablation")
+    TARGET_PATH = os.path.join(TARGET_PATH, "ablations")
 
 elif DATASET == "charades":
     TARGET_PATH = os.path.join(TARGET_PATH, "charades")
