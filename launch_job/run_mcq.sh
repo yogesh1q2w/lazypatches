@@ -54,7 +54,7 @@ DROPPING_POSITION="$6"
 if [ "$SAMPLER_TYPE" = "None" ]; then
     TARGET_PATH="${TARGET_PATH}/baseline"
 elif [ "$SAMPLER_TYPE" = "km_closest" ] && [ "$(echo "$HYPERPARAM != 0.5" | bc -l)" -eq 1 ]; then
-    TARGET_PATH="${TARGET_PATH}/ablation"
+    TARGET_PATH="${TARGET_PATH}/ablations"
 elif [ "$DATASET" = "charades" ]; then
     TARGET_PATH="${TARGET_PATH}/charades"
 elif [ "$DATASET" = "perceptiontest" ]; then
