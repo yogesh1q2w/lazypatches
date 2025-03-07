@@ -13,7 +13,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 """Qwen2VL model configuration"""
-
+from typing import List
+import sys
 from ...configuration_utils import PretrainedConfig
 from ...modeling_rope_utils import rope_config_validation
 from ...utils import logging
@@ -146,6 +147,20 @@ class Qwen2VLConfig(PretrainedConfig):
                     Only used with 'llama3'. Scaling factor applied to low frequency components of the RoPE
                 `high_freq_factor` (`float`, *optional*):
                     Only used with 'llama3'. Scaling factor applied to high frequency components of the RoPE
+        vt_sampling_strategy (`str`, *optional*, defaults to None):
+            Technique to use for sampling during Visual token selection. If None, the model will use all the tokens (no subsampling).
+            4 samplers will be placed in total: After 0%, 25%, 50% and 75% of decoder_layer blocks in the LLM
+            Expected contents:
+               `None`: No subsampling is used
+               `uniform`: Uniform sampling is used, need to specify sampled proportion for all 4 samplers
+               `gaussian`: Gaussian at center heuristic sampling is used, need to specify max. sampled proportion for all 4 samplers
+               `rl`: Reinforcement learning based sampling is used, need to specify max. sampled proportion for all 4 samplers
+
+        vt_sampling_proportion (`List[float]`, *optional*, defaults to None):
+            List of proportions for each sampler. If `vt_sampling_strategy` is not None, this list should have 4 elements.
+            If `vt_sampling_strategy` is `None`, this list is ignored.
+            If `vt_sampling_strategy` is `rl`, the elements of this list represent the maximum proportion of tokens RL-based sampling will retain.
+
 
     ```python
     >>> from transformers import Qwen2VLForConditionalGeneration, Qwen2VLConfig
@@ -185,6 +200,14 @@ class Qwen2VLConfig(PretrainedConfig):
         attention_dropout=0.0,
         vision_config=None,
         rope_scaling=None,
+        vt_sampling_strategy=None,
+        vt_sampling_proportion: List[float]=None,
+        dropping_position = int(sys.argv[6]),
+        selector_implementation = sys.argv[3],
+        retain_proportion = float(sys.argv[2]),
+        temporal_variance = float(sys.argv[5]),
+        spatial_variance = float(sys.argv[5]),
+        k_farthest = float(sys.argv[5]),
         **kwargs,
     ):
         if isinstance(vision_config, dict):
@@ -214,7 +237,16 @@ class Qwen2VLConfig(PretrainedConfig):
         self.rope_theta = rope_theta
         self.attention_dropout = attention_dropout
         self.rope_scaling = rope_scaling
+        self.vt_sampling_strategy = vt_sampling_strategy
+        self.vt_sampling_proportion = vt_sampling_proportion
+        self.k_farthest = k_farthest
 
+        self.dropping_position = dropping_position
+        self.selector_implementation = selector_implementation
+        self.retain_proportion = retain_proportion
+        self.temporal_variance = temporal_variance
+        self.spatial_variance = spatial_variance
+        
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, move it to 'rope_type'.
         # and change type from 'mrope' to 'default' because `mrope` does defeault RoPE calculations
