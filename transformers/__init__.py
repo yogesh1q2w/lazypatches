@@ -1215,9 +1215,7 @@ else:
     _import_structure["models.levit"].extend(["LevitFeatureExtractor", "LevitImageProcessor"])
     _import_structure["models.llava_next"].append("LlavaNextImageProcessor")
     _import_structure["models.llava_next_video"].append("LlavaNextVideoImageProcessor")
-    _import_structure["models.llava_onevision"].extend(
-        ["LlavaOnevisionImageProcessor", "LlavaOnevisionVideoProcessor"]
-    )
+    _import_structure["models.llava_onevision"].extend(["LlavaOnevisionImageProcessor", "LlavaOnevisionVideoProcessor"])
     _import_structure["models.mask2former"].append("Mask2FormerImageProcessor")
     _import_structure["models.maskformer"].extend(["MaskFormerFeatureExtractor", "MaskFormerImageProcessor"])
     _import_structure["models.mllama"].extend(["MllamaImageProcessor"])

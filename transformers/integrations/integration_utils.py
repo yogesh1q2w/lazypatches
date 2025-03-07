@@ -72,9 +72,7 @@ except (importlib.metadata.PackageNotFoundError, ImportError, ValueError, TypeEr
     _is_comet_recent_enough = False
     _is_comet_configured = False
 
-_has_neptune = (
-    importlib.util.find_spec("neptune") is not None or importlib.util.find_spec("neptune-client") is not None
-)
+_has_neptune = importlib.util.find_spec("neptune") is not None or importlib.util.find_spec("neptune-client") is not None
 if TYPE_CHECKING and _has_neptune:
     try:
         _neptune_version = importlib.metadata.version("neptune")
@@ -750,9 +748,7 @@ class WandbLogModel(str, Enum):
             )
             logger.info(f"Setting `WANDB_LOG_MODEL` from {os.getenv('WANDB_LOG_MODEL')} to `end` instead")
             return WandbLogModel.END
-        logger.warning(
-            f"Received unrecognized `WANDB_LOG_MODEL` setting value={value}; so disabling `WANDB_LOG_MODEL`"
-        )
+        logger.warning(f"Received unrecognized `WANDB_LOG_MODEL` setting value={value}; so disabling `WANDB_LOG_MODEL`")
         return WandbLogModel.FALSE
 
 
@@ -1817,9 +1813,7 @@ class ClearMLCallback(TrainerCallback):
             elif not self._clearml_task.get_parameter(ignore_hparams_config_section, default=True, cast=True):
                 self._clearml_task.connect(args, suffixed_hparams_section)
             else:
-                self._copy_training_args_as_hparams(
-                    args, ClearMLCallback._hparams_section + ClearMLCallback.log_suffix
-                )
+                self._copy_training_args_as_hparams(args, ClearMLCallback._hparams_section + ClearMLCallback.log_suffix)
 
             if getattr(model, "config", None) is not None:
                 ignore_model_config_section = (

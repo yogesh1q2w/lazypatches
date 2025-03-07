@@ -265,8 +265,7 @@ class ViTImageProcessor(BaseImageProcessor):
 
         if do_rescale:
             images = [
-                self.rescale(image=image, scale=rescale_factor, input_data_format=input_data_format)
-                for image in images
+                self.rescale(image=image, scale=rescale_factor, input_data_format=input_data_format) for image in images
             ]
 
         if do_normalize:

@@ -172,9 +172,7 @@ class RTDetrLoss(nn.Module):
 
         src_logits = outputs["logits"]
         target_classes_original = torch.cat([_target["class_labels"][i] for _target, (_, i) in zip(targets, indices)])
-        target_classes = torch.full(
-            src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device
-        )
+        target_classes = torch.full(src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_original
         target = F.one_hot(target_classes, num_classes=self.num_classes + 1)[..., :-1]
 
@@ -200,9 +198,7 @@ class RTDetrLoss(nn.Module):
 
         idx = self._get_source_permutation_idx(indices)
         target_classes_original = torch.cat([_target["class_labels"][i] for _target, (_, i) in zip(targets, indices)])
-        target_classes = torch.full(
-            src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device
-        )
+        target_classes = torch.full(src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_original
 
         loss_ce = F.cross_entropy(src_logits.transpose(1, 2), target_classes, self.class_weight)
@@ -282,9 +278,7 @@ class RTDetrLoss(nn.Module):
         src_logits = outputs["logits"]
         idx = self._get_source_permutation_idx(indices)
         target_classes_original = torch.cat([_target["class_labels"][i] for _target, (_, i) in zip(targets, indices)])
-        target_classes = torch.full(
-            src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device
-        )
+        target_classes = torch.full(src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_original
 
         target = F.one_hot(target_classes, num_classes=self.num_classes + 1)[..., :-1]
@@ -312,9 +306,7 @@ class RTDetrLoss(nn.Module):
 
         idx = self._get_source_permutation_idx(indices)
         target_classes_original = torch.cat([_target["class_labels"][i] for _target, (_, i) in zip(targets, indices)])
-        target_classes = torch.full(
-            src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device
-        )
+        target_classes = torch.full(src_logits.shape[:2], self.num_classes, dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_original
 
         target = F.one_hot(target_classes, num_classes=self.num_classes + 1)[..., :-1]

@@ -500,9 +500,11 @@ def _validate_bnb_multi_backend_availability(raise_exception):
     if not available_devices.intersection(bnb_supported_devices):
         if raise_exception:
             bnb_supported_devices_with_info = set(  # noqa: C401
-                '"cpu" (needs an Intel CPU and intel_extension_for_pytorch installed and compatible with the PyTorch version)'
-                if device == "cpu"
-                else device
+                (
+                    '"cpu" (needs an Intel CPU and intel_extension_for_pytorch installed and compatible with the PyTorch version)'
+                    if device == "cpu"
+                    else device
+                )
                 for device in bnb_supported_devices
             )
             err_msg = (

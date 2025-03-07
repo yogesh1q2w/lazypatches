@@ -1,4 +1,3 @@
-
 from PIL import Image
 import requests
 import torch
@@ -39,6 +38,6 @@ inputs = inputs.to(DEVICE)
 
 # Inference: Generation of the output
 output_ids = model.generate(**inputs, max_new_tokens=128)
-generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
+generated_ids = [output_ids[len(input_ids) :] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
 output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
 print(output_text)

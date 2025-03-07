@@ -819,8 +819,7 @@ class PreTrainedTokenizerFast(PreTrainedTokenizerBase):
             or tokenizer_json["pre_tokenizer"]["type"] == "Sequence"
             and "pretokenizers" in tokenizer_json["pre_tokenizer"]
             and any(
-                pretokenizer["type"] == "ByteLevel"
-                for pretokenizer in tokenizer_json["pre_tokenizer"]["pretokenizers"]
+                pretokenizer["type"] == "ByteLevel" for pretokenizer in tokenizer_json["pre_tokenizer"]["pretokenizers"]
             )
         ):
             kwargs["initial_alphabet"] = pre_tokenizers_fast.ByteLevel.alphabet()

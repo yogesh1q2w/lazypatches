@@ -1,5 +1,6 @@
 import numpy as np
 
+
 class IncrementalMCQAcc:
     def __init__(self):
         self.count = 0
@@ -20,7 +21,8 @@ class IncrementalMCQAcc:
 
     def get_num_test(self):
         return self.count
-    
+
+
 acc = IncrementalMCQAcc()
 current = acc.add_sample("2. open the door", "2. open the door")
 current = acc.add_sample("2. open the door", "3. open the door")

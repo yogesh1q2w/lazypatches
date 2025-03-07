@@ -559,9 +559,7 @@ class FlaxEncoderDecoderModel(FlaxPreTrainedModel):
             if past_key_values is not None:
                 raise ValueError("Make sure to provide `decoder_position_ids` when passing `past_key_values`.")
 
-            decoder_position_ids = jnp.broadcast_to(
-                jnp.arange(sequence_length)[None, :], (batch_size, sequence_length)
-            )
+            decoder_position_ids = jnp.broadcast_to(jnp.arange(sequence_length)[None, :], (batch_size, sequence_length))
 
         # Handle any PRNG if needed
         rngs = {}
@@ -696,9 +694,7 @@ class FlaxEncoderDecoderModel(FlaxPreTrainedModel):
             decoder_attention_mask = jnp.ones_like(decoder_input_ids)
         if decoder_position_ids is None:
             batch_size, sequence_length = decoder_input_ids.shape
-            decoder_position_ids = jnp.broadcast_to(
-                jnp.arange(sequence_length)[None, :], (batch_size, sequence_length)
-            )
+            decoder_position_ids = jnp.broadcast_to(jnp.arange(sequence_length)[None, :], (batch_size, sequence_length))
 
         # Handle any PRNG if needed
         rngs = {"dropout": dropout_rng} if dropout_rng is not None else {}

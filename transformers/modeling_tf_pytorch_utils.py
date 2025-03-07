@@ -52,9 +52,7 @@ class TransposeType(ExplicitEnum):
     CONV2D = "conv2d"
 
 
-def convert_tf_weight_name_to_pt_weight_name(
-    tf_name, start_prefix_to_remove="", tf_weight_shape=None, name_scope=None
-):
+def convert_tf_weight_name_to_pt_weight_name(tf_name, start_prefix_to_remove="", tf_weight_shape=None, name_scope=None):
     """
     Convert a TF 2.0 model variable name in a pytorch model weight name.
 
@@ -249,9 +247,7 @@ def load_pytorch_weights_in_tf2_model(
         raise
 
     # Numpy doesn't understand bfloat16, so upcast to a dtype that doesn't lose precision
-    pt_state_dict = {
-        k: v.numpy() if v.dtype != torch.bfloat16 else v.float().numpy() for k, v in pt_state_dict.items()
-    }
+    pt_state_dict = {k: v.numpy() if v.dtype != torch.bfloat16 else v.float().numpy() for k, v in pt_state_dict.items()}
     return load_pytorch_state_dict_in_tf2_model(
         tf_model,
         pt_state_dict,

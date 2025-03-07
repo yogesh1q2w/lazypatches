@@ -57,9 +57,7 @@ class GptqHfQuantizer(HfQuantizer):
                 "Loading a GPTQ quantized model requires optimum (`pip install optimum`) and auto-gptq library (`pip install auto-gptq`)"
             )
         elif version.parse(importlib.metadata.version("auto_gptq")) < version.parse("0.4.2"):
-            raise ImportError(
-                "You need a version of auto_gptq >= 0.4.2 to use GPTQ: `pip install --upgrade auto-gptq`"
-            )
+            raise ImportError("You need a version of auto_gptq >= 0.4.2 to use GPTQ: `pip install --upgrade auto-gptq`")
 
     def update_torch_dtype(self, torch_dtype: "torch.dtype") -> "torch.dtype":
         if torch_dtype is None:

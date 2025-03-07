@@ -351,7 +351,5 @@ class Bnb4BitHfQuantizer(HfQuantizer):
     def _dequantize(self, model):
         from ..integrations import dequantize_and_replace
 
-        model = dequantize_and_replace(
-            model, self.modules_to_not_convert, quantization_config=self.quantization_config
-        )
+        model = dequantize_and_replace(model, self.modules_to_not_convert, quantization_config=self.quantization_config)
         return model

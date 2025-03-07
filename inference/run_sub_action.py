@@ -25,8 +25,8 @@ SAMPLER_TYPE = sys.argv[3]
 HYPERPARAM = float(sys.argv[5])
 DROPPING_POSITION = int(sys.argv[6])
 
-#argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
- 
+# argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
+
 TARGET_PATH = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
 
 logging.basicConfig(
@@ -34,41 +34,49 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler(os.path.join(TARGET_PATH, "evaluation.log")),  # Log to a file
-        logging.StreamHandler(sys.stdout),      # Log to console
-    ]
+        logging.StreamHandler(sys.stdout),  # Log to console
+    ],
 )
 logger = logging.getLogger(__name__)
 
-RELOAD=True
+RELOAD = True
 if DATASET == "charades":
     if RELOAD:
-        dataset = Sub_CharadesActionMCQ(dataset_path=os.path.join(DATASET_PATH, "subset_charades_mcq.json"), reload=RELOAD)
+        dataset = Sub_CharadesActionMCQ(
+            dataset_path=os.path.join(DATASET_PATH, "subset_charades_mcq.json"), reload=RELOAD
+        )
     else:
-        dataset = Sub_CharadesActionMCQ(dataset_path=os.path.join(DATASET_PATH, "subset_charades_mcq.json"),
-                                        videos_path=os.path.join(DATASET_PATH, "videos/Charades_v1"),
-                                        labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
-                                        classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
-                                        n_wrong_options=4,
-                                        reload=RELOAD
-                                        )
+        dataset = Sub_CharadesActionMCQ(
+            dataset_path=os.path.join(DATASET_PATH, "subset_charades_mcq.json"),
+            videos_path=os.path.join(DATASET_PATH, "videos/Charades_v1"),
+            labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
+            classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
+            n_wrong_options=4,
+            reload=RELOAD,
+        )
 elif DATASET == "perceptiontest":
     if RELOAD:
-        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path=os.path.join(DATASET_PATH, "sub_perceptiontest_mcq.json"), reload=RELOAD)
+        perceptiontest_dataset = SubPerceptiontestMCQ(
+            dataset_path=os.path.join(DATASET_PATH, "sub_perceptiontest_mcq.json"), reload=RELOAD
+        )
     else:
-        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path=os.path.join(DATASET_PATH, "sub_perceptiontest_mcq.json"),
-                                        videos_path=os.path.join(DATASET_PATH, "valid/videos"),
-                                        labels_path=os.path.join(DATASET_PATH, "valid/all_valid.json"),
-                                        reload=RELOAD
-                                        )
+        perceptiontest_dataset = SubPerceptiontestMCQ(
+            dataset_path=os.path.join(DATASET_PATH, "sub_perceptiontest_mcq.json"),
+            videos_path=os.path.join(DATASET_PATH, "valid/videos"),
+            labels_path=os.path.join(DATASET_PATH, "valid/all_valid.json"),
+            reload=RELOAD,
+        )
 
 model = Qwen2VLForConditionalGeneration.from_pretrained(MODEL_CHECKPOINT_PATH, device_map="auto", torch_dtype="auto")
 processor = Qwen2VLProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 
 print("Loading model complete", flush=True)
 
+
 def normalize_text(text):
     """Normalize text for comparison"""
     return text.strip().lower() if isinstance(text, str) else ""
+
 
 data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
 print("Length of dataset: ", len(dataset), flush=True)
@@ -102,9 +110,9 @@ for step, data in enumerate(data_loader):
         inputs = inputs.to(DEVICE)
 
         output_ids = model.generate(**inputs, max_new_tokens=128)
-        generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
+        generated_ids = [output_ids[len(input_ids) :] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
         output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-        
+
         print(int(idx), output_text[0], flush=True)
         print(answer, flush=True)
         print("-------------------", flush=True)
@@ -112,39 +120,43 @@ for step, data in enumerate(data_loader):
         # Evaluate correctness
         pred = normalize_text(output_text[0]) if isinstance(output_text, list) and output_text else ""
         gt = normalize_text(answer)
-        is_correct = any([
-            gt in pred,       # Check if answer is substring of prediction
-            pred == gt,       # Exact match
-            pred.startswith(gt.split()[0])  # Handle partial matches
-        ])
+        is_correct = any(
+            [
+                gt in pred,  # Check if answer is substring of prediction
+                pred == gt,  # Exact match
+                pred.startswith(gt.split()[0]),  # Handle partial matches
+            ]
+        )
 
         # Store results
-        results.append({
-            "idx": int(idx),
-            "question": question,
-            "answer": answer,
-            "prediction": output_text,
-            "is_correct": is_correct,
-        })
+        results.append(
+            {
+                "idx": int(idx),
+                "question": question,
+                "answer": answer,
+                "prediction": output_text,
+                "is_correct": is_correct,
+            }
+        )
         torch.cuda.empty_cache()
-        
+
     except Exception as e:
-        logger.info(f'Exception thrown is {e}')
+        logger.info(f"Exception thrown is {e}")
         failed_indices.append(int(idx))
         torch.cuda.empty_cache()
 
     if step % SAVE_EVERY == 0:
-        json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
-        json.dump(failed_indices, open(os.path.join(TARGET_PATH,"failed_indices.json"), "w"))
+        json.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
+        json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
         print(f"saved till step {step}", file=sys.stderr)
-        
+
         current_accuracy = sum(r["is_correct"] for r in results) / len(results) if len(results) > 0 else 0
         logger.info(f"Processed {step}/{len(dataset)} - Current ACC: {current_accuracy:.4f}")
-        
+
     torch.cuda.empty_cache()
-    
-json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
-json.dump(failed_indices, open(os.path.join(TARGET_PATH,"failed_indices.json"), "w"))
+
+json.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
+json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
 
 
 # Calculate final metrics

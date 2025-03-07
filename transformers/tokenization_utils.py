@@ -557,9 +557,7 @@ class PreTrainedTokenizer(PreTrainedTokenizerBase):
                 else:
                     # very important for fast and slow equivalence!
                     is_special = token in self.all_special_tokens or special_tokens
-                    token = AddedToken(
-                        token, rstrip=False, lstrip=False, normalized=not is_special, special=is_special
-                    )
+                    token = AddedToken(token, rstrip=False, lstrip=False, normalized=not is_special, special=is_special)
             elif special_tokens:
                 # doing token.special=True changes the normalization! will fix in rust
                 # this is important and the only reason why the AddedTokens in each class are normalized by default

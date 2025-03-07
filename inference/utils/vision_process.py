@@ -30,9 +30,10 @@ VIDEO_MIN_PIXELS = 128 * 28 * 28
 VIDEO_MAX_PIXELS = 225 * 28 * 28
 VIDEO_TOTAL_PIXELS = 225 * 28 * 28
 FRAME_FACTOR = 2
-FPS = 20 #THIS REMAINS FIXED, ARGUMENT FPS IS FOR SECOND FETCH_VIDEO 
+FPS = 20  # THIS REMAINS FIXED, ARGUMENT FPS IS FOR SECOND FETCH_VIDEO
 FPS_MIN_FRAMES = 4
 FPS_MAX_FRAMES = 60
+
 
 def round_by_factor(number: int, factor: int) -> int:
     """Returns the closest integer to 'number' that is divisible by 'factor'."""
@@ -218,11 +219,12 @@ def _read_video_decord(
         torch.Tensor: the video tensor with shape (T, C, H, W).
     """
     import decord
+
     video_path = ele["video"]
     st = time.time()
     vr = decord.VideoReader(video_path)
     # TODO: support start_pts and end_pts
-    if 'video_start' in ele or 'video_end' in ele:
+    if "video_start" in ele or "video_end" in ele:
         raise NotImplementedError("not support start_pts and end_pts in decord for now.")
     total_frames, video_fps = len(vr), vr.get_avg_fps()
     logger.info(f"decord:  {video_path=}, {total_frames=}, {video_fps=}, time={time.time() - st:.3f}s")

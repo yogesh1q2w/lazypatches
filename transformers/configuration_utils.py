@@ -695,9 +695,7 @@ class PretrainedConfig(PushToHubMixin):
             logger.info(f"loading configuration file {configuration_file} from cache at {resolved_config_file}")
 
         if "auto_map" in config_dict and not is_local:
-            config_dict["auto_map"] = add_model_info_to_auto_map(
-                config_dict["auto_map"], pretrained_model_name_or_path
-            )
+            config_dict["auto_map"] = add_model_info_to_auto_map(config_dict["auto_map"], pretrained_model_name_or_path)
         if "custom_pipelines" in config_dict and not is_local:
             config_dict["custom_pipelines"] = add_model_info_to_custom_pipelines(
                 config_dict["custom_pipelines"], pretrained_model_name_or_path

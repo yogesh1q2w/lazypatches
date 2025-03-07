@@ -313,9 +313,7 @@ def get_json_schema(func: Callable) -> Dict:
     """
     doc = inspect.getdoc(func)
     if not doc:
-        raise DocstringParsingException(
-            f"Cannot generate JSON schema for {func.__name__} because it has no docstring!"
-        )
+        raise DocstringParsingException(f"Cannot generate JSON schema for {func.__name__} because it has no docstring!")
     doc = doc.strip()
     main_doc, param_descriptions, return_doc = parse_google_format_docstring(doc)
 

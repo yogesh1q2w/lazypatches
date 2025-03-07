@@ -5,30 +5,31 @@ from tqdm import tqdm
 import torch.utils.data as data
 from inference.utils.vision_process import fetch_video
 
+
 def parse_video_and_mcq_json(filename):
     with open(filename, "r") as f:
         data = json.load(f)
-    
+
     parsed_data = {}
 
     for video_id, video_info in data.items():
-        parsed_data[video_id] = {
-            "metadata": video_info["metadata"],
-            "mcq_data": []
-        }
+        parsed_data[video_id] = {"metadata": video_info["metadata"], "mcq_data": []}
 
         for mcq in video_info["mc_question"]:
-            parsed_data[video_id]["mcq_data"].append({
-                "id": mcq["id"],
-                "question": mcq["question"],
-                "options": mcq["options"],
-                "answer_id": mcq["answer_id"],
-                "area": mcq["area"],
-                "reasoning": mcq["reasoning"],
-                "tag": mcq["tag"]
-            })
+            parsed_data[video_id]["mcq_data"].append(
+                {
+                    "id": mcq["id"],
+                    "question": mcq["question"],
+                    "options": mcq["options"],
+                    "answer_id": mcq["answer_id"],
+                    "area": mcq["area"],
+                    "reasoning": mcq["reasoning"],
+                    "tag": mcq["tag"],
+                }
+            )
 
     return parsed_data
+
 
 class PerceptiontestMCQ(data.Dataset):
     def __init__(
@@ -39,7 +40,7 @@ class PerceptiontestMCQ(data.Dataset):
         # classes_path=None,
         # n_wrong_options=None,
         reload=True,
-        target_fps=2.0
+        target_fps=2.0,
     ):
         # give either already exisiting dataset or corresponding paths to build one
         if reload:
@@ -49,19 +50,20 @@ class PerceptiontestMCQ(data.Dataset):
             assert dataset_path is not None and videos_path is not None and labels_path is not None
 
             video_mcqs_info = parse_video_and_mcq_json(labels_path)
-            
+
             mcq_data = self.prepare(video_mcqs_info, videos_path)
-            
-            self.data = {"videos_path": videos_path,
-                            "labels_path": labels_path,
-                            # "classes_path": classes_path,
-                            # "n_wrong_options": n_wrong_options,
-                            "mcq_data": mcq_data,
-                            "n_samples": len(mcq_data["mcqs"])
-                            }
+
+            self.data = {
+                "videos_path": videos_path,
+                "labels_path": labels_path,
+                # "classes_path": classes_path,
+                # "n_wrong_options": n_wrong_options,
+                "mcq_data": mcq_data,
+                "n_samples": len(mcq_data["mcqs"]),
+            }
             json.dump(self.data, open(dataset_path, "w"))
         self.target_fps = target_fps
-        
+
     def prepare(self, video_mcqs_info, videos_path):
         video_paths = []
         video_ids = []
@@ -83,9 +85,11 @@ class PerceptiontestMCQ(data.Dataset):
 
             # extract question and answer
             for mcq in mcq_list:
-                mcq_text = mcq["question"] + "\n" + "\n".join(
-                            [f"({idx}) {option}" for idx, option in enumerate(mcq["options"])]
-                            )
+                mcq_text = (
+                    mcq["question"]
+                    + "\n"
+                    + "\n".join([f"({idx}) {option}" for idx, option in enumerate(mcq["options"])])
+                )
                 mcqs.append(mcq_text)
 
                 # (index) option_text"

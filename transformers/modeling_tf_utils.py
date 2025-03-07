@@ -702,9 +702,7 @@ def tf_shard_checkpoint(weights, max_shard_size="10GB", weights_name: str = TF2_
     shards = {}
     for idx, shard in enumerate(sharded_state_dicts):
         shard_file = weights_name.replace(".h5", f"-{idx+1:05d}-of-{len(sharded_state_dicts):05d}.h5")
-        shard_file = shard_file.replace(
-            ".safetensors", f"-{idx + 1:05d}-of-{len(sharded_state_dicts):05d}.safetensors"
-        )
+        shard_file = shard_file.replace(".safetensors", f"-{idx + 1:05d}-of-{len(sharded_state_dicts):05d}.safetensors")
         shards[shard_file] = shard
         for weight in shard:
             weight_name = weight.name
@@ -949,9 +947,7 @@ def load_tf_weights(model, resolved_archive_file, ignore_mismatched_sizes=False,
     else:
         load_function = load_tf_weights_from_h5
 
-    return load_function(
-        model, resolved_archive_file, ignore_mismatched_sizes=ignore_mismatched_sizes, _prefix=_prefix
-    )
+    return load_function(model, resolved_archive_file, ignore_mismatched_sizes=ignore_mismatched_sizes, _prefix=_prefix)
 
 
 def load_tf_weights_from_h5(model, resolved_archive_file, ignore_mismatched_sizes=False, _prefix=None):
@@ -3213,9 +3209,7 @@ class TFPreTrainedModel(keras.Model, TFModelUtilsMixin, TFGenerationMixin, PushT
         else:
             working_dir = repo_id.split("/")[-1]
 
-        repo_id = self._create_repo(
-            repo_id, private=private, token=token, repo_url=repo_url, organization=organization
-        )
+        repo_id = self._create_repo(repo_id, private=private, token=token, repo_url=repo_url, organization=organization)
 
         if use_temp_dir is None:
             use_temp_dir = not os.path.isdir(working_dir)

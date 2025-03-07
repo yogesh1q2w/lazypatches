@@ -372,8 +372,8 @@ class StopStringCriteria(StoppingCriteria):
             for token_idx, possible_end_lens in end_lens.items():
                 gather_vec[
                     token_idx,
-                    max_valid_positions * len(stop_strings) + max_valid_end_lens * i : max_valid_positions
-                    * len(stop_strings)
+                    max_valid_positions * len(stop_strings)
+                    + max_valid_end_lens * i : max_valid_positions * len(stop_strings)
                     + max_valid_end_lens * i
                     + len(possible_end_lens),
                 ] = possible_end_lens

@@ -383,10 +383,9 @@ class GenerationMixin:
         #              (we can't check exception 3 while compiling)
         if past_key_values is not None:
             model_inputs["past_key_values"] = past_key_values
-            if (
-                inputs_embeds is not None  # Exception 1
-                or (is_torchdynamo_compiling() or cache_position[-1] >= input_ids.shape[1])  # Exception 3
-            ):
+            if inputs_embeds is not None or (  # Exception 1
+                is_torchdynamo_compiling() or cache_position[-1] >= input_ids.shape[1]
+            ):  # Exception 3
                 input_ids = input_ids[:, -cache_position.shape[0] :]
             elif input_ids.shape[1] != cache_position.shape[0]:  # Default case (the "else", a no op, is Exception 2)
                 input_ids = input_ids[:, cache_position]
@@ -1075,9 +1074,7 @@ class GenerationMixin:
                 )
             if generation_config.epsilon_cutoff is not None and 0.0 < generation_config.epsilon_cutoff < 1.0:
                 processors.append(
-                    EpsilonLogitsWarper(
-                        epsilon=generation_config.epsilon_cutoff, min_tokens_to_keep=min_tokens_to_keep
-                    )
+                    EpsilonLogitsWarper(epsilon=generation_config.epsilon_cutoff, min_tokens_to_keep=min_tokens_to_keep)
                 )
             if generation_config.eta_cutoff is not None and 0.0 < generation_config.eta_cutoff < 1.0:
                 processors.append(
@@ -1088,9 +1085,7 @@ class GenerationMixin:
 
         # Watermarking should be after all logits processing is finished (see #34630)
         if generation_config.watermarking_config is not None:
-            processors.append(
-                generation_config.watermarking_config.construct_processor(self.config.vocab_size, device)
-            )
+            processors.append(generation_config.watermarking_config.construct_processor(self.config.vocab_size, device))
 
         # `LogitNormalization` should always be the last logit processor, when present
         if generation_config.renormalize_logits is True:
@@ -2402,13 +2397,10 @@ class GenerationMixin:
             # handle BC (convert by default if he user hasn't passed a cache AND the cache is of the default type)
             should_convert_cache = generation_config.return_legacy_cache
             is_user_defined_cache = user_defined_cache is not None
-            is_default_cache_type = (
-                type(result.past_key_values) == DynamicCache  # noqa E721
-                or (
-                    isinstance(result.past_key_values, EncoderDecoderCache)
-                    and type(result.past_key_values.self_attention_cache) == DynamicCache  # noqa E721
-                    and type(result.past_key_values.cross_attention_cache) == DynamicCache  # noqa E721
-                )
+            is_default_cache_type = type(result.past_key_values) == DynamicCache or (  # noqa E721
+                isinstance(result.past_key_values, EncoderDecoderCache)
+                and type(result.past_key_values.self_attention_cache) == DynamicCache  # noqa E721
+                and type(result.past_key_values.cross_attention_cache) == DynamicCache  # noqa E721
             )
             if not is_user_defined_cache and is_default_cache_type:
                 logger.warning_once(
@@ -2710,9 +2702,7 @@ class GenerationMixin:
 
                 if output_hidden_states:
                     decoder_hidden_states += (
-                        (outputs.decoder_hidden_states,)
-                        if self.config.is_encoder_decoder
-                        else (outputs.hidden_states,)
+                        (outputs.decoder_hidden_states,) if self.config.is_encoder_decoder else (outputs.hidden_states,)
                     )
 
             if do_sample:  # sample
@@ -2915,9 +2905,7 @@ class GenerationMixin:
 
                 if output_hidden_states:
                     decoder_hidden_states += (
-                        (outputs.decoder_hidden_states,)
-                        if self.config.is_encoder_decoder
-                        else (outputs.hidden_states,)
+                        (outputs.decoder_hidden_states,) if self.config.is_encoder_decoder else (outputs.hidden_states,)
                     )
 
             # This is needed to properly delete outputs.logits which may be very large for this first iteration
@@ -3286,9 +3274,7 @@ class GenerationMixin:
 
                 if output_hidden_states:
                     decoder_hidden_states += (
-                        (outputs.decoder_hidden_states,)
-                        if self.config.is_encoder_decoder
-                        else (outputs.hidden_states,)
+                        (outputs.decoder_hidden_states,) if self.config.is_encoder_decoder else (outputs.hidden_states,)
                     )
 
             # token selection
@@ -3541,9 +3527,7 @@ class GenerationMixin:
                         cross_attentions += (outputs.cross_attentions,)
                 if output_hidden_states:
                     decoder_hidden_states += (
-                        (outputs.decoder_hidden_states,)
-                        if self.config.is_encoder_decoder
-                        else (outputs.hidden_states,)
+                        (outputs.decoder_hidden_states,) if self.config.is_encoder_decoder else (outputs.hidden_states,)
                     )
 
             # reshape for beam search
@@ -3872,9 +3856,7 @@ class GenerationMixin:
 
                 if output_hidden_states:
                     decoder_hidden_states += (
-                        (outputs.decoder_hidden_states,)
-                        if self.config.is_encoder_decoder
-                        else (outputs.hidden_states,)
+                        (outputs.decoder_hidden_states,) if self.config.is_encoder_decoder else (outputs.hidden_states,)
                     )
 
             input_ids = torch.cat([input_ids, current_tokens.unsqueeze(-1)], dim=-1)
@@ -4081,9 +4063,7 @@ class GenerationMixin:
 
                 if output_hidden_states:
                     decoder_hidden_states += (
-                        (outputs.decoder_hidden_states,)
-                        if self.config.is_encoder_decoder
-                        else (outputs.hidden_states,)
+                        (outputs.decoder_hidden_states,) if self.config.is_encoder_decoder else (outputs.hidden_states,)
                     )
 
             # reshape for beam search

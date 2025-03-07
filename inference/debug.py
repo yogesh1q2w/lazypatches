@@ -15,8 +15,8 @@ logging.basicConfig(
     format="%(asctime)s - %(levelname)s - %(message)s",
     handlers=[
         logging.FileHandler("evaluation.log"),  # Log to a file
-        logging.StreamHandler(sys.stdout),      # Log to console
-    ]
+        logging.StreamHandler(sys.stdout),  # Log to console
+    ],
 )
 logger = logging.getLogger(__name__)
 
@@ -34,11 +34,7 @@ charades_dataset = CharadesActionMCQ(dataset_path=DATASET_PATH, reload=True)
 
 # Load model and processor
 logger.info("Loading model and processor...")
-model = Qwen2VLForConditionalGeneration.from_pretrained(
-    MODEL_CHECKPOINT_PATH, 
-    device_map="auto", 
-    torch_dtype="auto"
-)
+model = Qwen2VLForConditionalGeneration.from_pretrained(MODEL_CHECKPOINT_PATH, device_map="auto", torch_dtype="auto")
 processor = AutoProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 logger.info("Model and processor loaded successfully.")
 
@@ -49,9 +45,11 @@ logger.info(f"Dataset contains {len(charades_dataset)} samples.")
 results = []
 failed_indices = []
 
+
 def normalize_text(text):
     """Normalize text for comparison"""
     return text.strip().lower()
+
 
 for step, data in enumerate(data_loader):
     idx, video, question, answer = data
@@ -65,14 +63,16 @@ for step, data in enumerate(data_loader):
         logger.info(f"Video shape: {video.shape}")
 
         # Prepare input
-        conversation = [{
-            "role": "user",
-            "content": [
-                {"type": "video"},
-                {"type": "text", "text": question},
-            ]
-        }]
-        
+        conversation = [
+            {
+                "role": "user",
+                "content": [
+                    {"type": "video"},
+                    {"type": "text", "text": question},
+                ],
+            }
+        ]
+
         # Debugging: Log conversation template
         logger.info("Conversation template:")
         logger.info(conversation)
@@ -82,12 +82,7 @@ for step, data in enumerate(data_loader):
         logger.info("Text prompt after applying template:")
         logger.info(text_prompt)
 
-        inputs = processor(
-            text=[text_prompt], 
-            videos=[video], 
-            padding=True, 
-            return_tensors="pt"
-        ).to(DEVICE)
+        inputs = processor(text=[text_prompt], videos=[video], padding=True, return_tensors="pt").to(DEVICE)
 
         # Debugging: Log input tensors
         logger.info("Input tensors:")
@@ -96,11 +91,9 @@ for step, data in enumerate(data_loader):
 
         # Generate output
         output_ids = model.generate(**inputs, max_new_tokens=128)
-        generated_ids = output_ids[:, inputs.input_ids.shape[1]:]
+        generated_ids = output_ids[:, inputs.input_ids.shape[1] :]
         output_text = processor.batch_decode(
-            generated_ids, 
-            skip_special_tokens=True, 
-            clean_up_tokenization_spaces=True
+            generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True
         )[0]
 
         # Debugging: Log model output
@@ -110,29 +103,35 @@ for step, data in enumerate(data_loader):
         # Evaluate correctness
         pred = normalize_text(output_text)
         gt = normalize_text(answer)
-        is_correct = any([
-            gt in pred,       # Check if answer is substring of prediction
-            pred == gt,       # Exact match
-            pred.startswith(gt.split()[0])  # Handle partial matches
-        ])
-        
+        is_correct = any(
+            [
+                gt in pred,  # Check if answer is substring of prediction
+                pred == gt,  # Exact match
+                pred.startswith(gt.split()[0]),  # Handle partial matches
+            ]
+        )
+
         # Debugging: Log evaluation result
         logger.info(f"Prediction: {pred}")
         logger.info(f"Ground Truth: {gt}")
         logger.info(f"Correct: {is_correct}")
 
         # Store results
-        results.append({
-            "idx": int(idx),
-            "question": question,
-            "answer": answer,
-            "prediction": output_text,
-            "is_correct": is_correct
-        })
+        results.append(
+            {
+                "idx": int(idx),
+                "question": question,
+                "answer": answer,
+                "prediction": output_text,
+                "is_correct": is_correct,
+            }
+        )
 
         # Progress logging
         if step % 10 == 0:
-            logger.info(f"Processed {step}/{len(charades_dataset)} - Current ACC: {sum(r['is_correct'] for r in results)/len(results):.2f}")
+            logger.info(
+                f"Processed {step}/{len(charades_dataset)} - Current ACC: {sum(r['is_correct'] for r in results)/len(results):.2f}"
+            )
 
         # Periodic saving
         if step % SAVE_EVERY == 0:
@@ -147,7 +146,7 @@ for step, data in enumerate(data_loader):
         # Interactive debugging with pdb
         logger.error("Entering pdb for interactive debugging...")
         pdb.post_mortem()  # Drop into pdb at the point of failure
-    
+
     torch.cuda.empty_cache()
 
 # Final save

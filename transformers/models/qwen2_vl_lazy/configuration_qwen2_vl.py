@@ -201,13 +201,13 @@ class Qwen2VLConfig(PretrainedConfig):
         vision_config=None,
         rope_scaling=None,
         vt_sampling_strategy=None,
-        vt_sampling_proportion: List[float]=None,
-        dropping_position = int(sys.argv[6]),
-        selector_implementation = sys.argv[3],
-        retain_proportion = float(sys.argv[2]),
-        temporal_variance = float(sys.argv[5]),
-        spatial_variance = float(sys.argv[5]),
-        k_farthest = float(sys.argv[5]),
+        vt_sampling_proportion: List[float] = None,
+        dropping_position=int(sys.argv[6]),
+        selector_implementation=sys.argv[3],
+        retain_proportion=float(sys.argv[2]),
+        temporal_variance=float(sys.argv[5]),
+        spatial_variance=float(sys.argv[5]),
+        k_farthest=float(sys.argv[5]),
         **kwargs,
     ):
         if isinstance(vision_config, dict):
@@ -246,7 +246,7 @@ class Qwen2VLConfig(PretrainedConfig):
         self.retain_proportion = retain_proportion
         self.temporal_variance = temporal_variance
         self.spatial_variance = spatial_variance
-        
+
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, move it to 'rope_type'.
         # and change type from 'mrope' to 'default' because `mrope` does defeault RoPE calculations

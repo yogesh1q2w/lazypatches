@@ -1,4 +1,5 @@
-""" Dataset loader for the Charades dataset """
+"""Dataset loader for the Charades dataset"""
+
 import torch
 import torchvision.transforms as transforms
 import torch.utils.data as data
@@ -18,23 +19,24 @@ def parse_charades_csv(filename):
     with open(filename) as f:
         reader = csv.DictReader(f)
         for row in reader:
-            vid = row['id']
-            actions = row['actions']
-            if actions == '':
+            vid = row["id"]
+            actions = row["actions"]
+            if actions == "":
                 actions = []
             else:
-                actions = [a.split(' ') for a in actions.split(';')]
-                actions = [{'class': x} for x, y, z in actions]
+                actions = [a.split(" ") for a in actions.split(";")]
+                actions = [{"class": x} for x, y, z in actions]
             labels[vid] = actions
     return labels
+
 
 def parse_charades_csv_video(filename):
     labels = {}
     with open(filename) as f:
         reader = csv.DictReader(f)
         for row in reader:
-            vid = row['id']
-            description = row['descriptions']
+            vid = row["id"]
+            description = row["descriptions"]
             labels[vid] = description
     return labels
 
@@ -45,9 +47,9 @@ def cls2int(x):
 
 def pil_loader(path):
     # open path as file to avoid ResourceWarning (https://github.com/python-pillow/Pillow/issues/835)
-    with open(path, 'rb') as f:
+    with open(path, "rb") as f:
         img = Image.open(f)
-        return img.convert('RGB')
+        return img.convert("RGB")
 
 
 # def accimage_loader(path):
@@ -68,24 +70,29 @@ def pil_loader(path):
 
 
 def cache(cachefile):
-    """ Creates a decorator that caches the result to cachefile """
+    """Creates a decorator that caches the result to cachefile"""
+
     def cachedecorator(fn):
         def newf(*args, **kwargs):
-            print('cachefile {}'.format(cachefile))
+            print("cachefile {}".format(cachefile))
             if os.path.exists(cachefile):
-                with open(cachefile, 'rb') as f:
+                with open(cachefile, "rb") as f:
                     print("Loading cached result from '%s'" % cachefile)
                     return pickle.load(f)
             res = fn(*args, **kwargs)
-            with open(cachefile, 'wb') as f:
+            with open(cachefile, "wb") as f:
                 print("Saving result to cache '%s'" % cachefile)
                 pickle.dump(res, f)
             return res
+
         return newf
+
     return cachedecorator
 
+
 def fetch_video(ele: Dict, nframe_factor=2):
-    if isinstance(ele['video'], str):
+    if isinstance(ele["video"], str):
+
         def round_by_factor(number: int, factor: int) -> int:
             return round(number / factor) * factor
 
@@ -122,10 +129,10 @@ class Charades_decription(data.Dataset):
         self.labels = parse_charades_csv(labelpath)
         self.root = root
         # cachename = '{}/{}_{}.pkl'.format(cachedir,
-                                        #   self.__class__.__name__, split)
+        #   self.__class__.__name__, split)
         # self.data = cache(cachename)(self.prepare)(root, self.labels)
         self.data = self.prepare(root, self.labels)
-    
+
     def prepare(self, path, labels):
         datadir = path
         video_paths, targets, ids = [], [], []
@@ -140,15 +147,14 @@ class Charades_decription(data.Dataset):
             #     print("{} {}".format(i, datadir))
             # if n == 0:
             #     continue
-            
-            video_path = '{}/{}.mp4'.format(
-                            datadir, vid)
+
+            video_path = "{}/{}.mp4".format(datadir, vid)
             print(label)
             video_paths.append(video_path)
             targets.append(label)
             ids.append(vid)
-                
-        return {'video_paths': video_paths, 'targets': targets, 'ids': ids}
+
+        return {"video_paths": video_paths, "targets": targets, "ids": ids}
 
     def __getitem__(self, index):
         """
@@ -157,32 +163,29 @@ class Charades_decription(data.Dataset):
         Returns:
             tuple: (frames, conversation, target_description).
         """
-        path = self.data['video_paths'][index]
+        path = self.data["video_paths"][index]
         print(path)
-        target = self.data['targets'][index]
+        target = self.data["targets"][index]
         meta = {}
-        meta['id'] = self.data['ids'][index]
-        
+        meta["id"] = self.data["ids"][index]
+
         video_info = {"type": "video", "video": path, "fps": 1.0}
         video = fetch_video(video_info)
         text = "Describe the video."
         print(path)
-        
+
         return video, text, target
 
     def __len__(self):
         # print(len(self.data['video_paths']))
-        return len(self.data['video_paths'])
+        return len(self.data["video_paths"])
 
     def __repr__(self):
-        fmt_str = 'Dataset ' + self.__class__.__name__ + '\n'
-        fmt_str += '    Number of datapoints: {}\n'.format(self.__len__())
-        fmt_str += '    Root Location: {}\n'.format(self.root)
-        tmp = '    Transforms (if any): '
-        fmt_str += '{0}{1}\n'.format(
-            tmp, self.transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
-        tmp = '    Target Transforms (if any): '
-        fmt_str += '{0}{1}'.format(
-            tmp, self.target_transform.__repr__().replace('\n', '\n' + ' ' * len(tmp)))
+        fmt_str = "Dataset " + self.__class__.__name__ + "\n"
+        fmt_str += "    Number of datapoints: {}\n".format(self.__len__())
+        fmt_str += "    Root Location: {}\n".format(self.root)
+        tmp = "    Transforms (if any): "
+        fmt_str += "{0}{1}\n".format(tmp, self.transform.__repr__().replace("\n", "\n" + " " * len(tmp)))
+        tmp = "    Target Transforms (if any): "
+        fmt_str += "{0}{1}".format(tmp, self.target_transform.__repr__().replace("\n", "\n" + " " * len(tmp)))
         return fmt_str
-

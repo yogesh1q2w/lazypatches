@@ -315,9 +315,7 @@ class AutoProcessor:
         )
 
         if has_remote_code and trust_remote_code:
-            processor_class = get_class_from_dynamic_module(
-                processor_auto_map, pretrained_model_name_or_path, **kwargs
-            )
+            processor_class = get_class_from_dynamic_module(processor_auto_map, pretrained_model_name_or_path, **kwargs)
             _ = kwargs.pop("code_revision", None)
             if os.path.isdir(pretrained_model_name_or_path):
                 processor_class.register_for_auto_class()

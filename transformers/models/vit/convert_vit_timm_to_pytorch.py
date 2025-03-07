@@ -158,9 +158,7 @@ def convert_vit_checkpoint(vit_name, pytorch_dump_folder_path):
 
     # SigLIP style vit with attn_pool layer present
     if "siglip" in vit_name and getattr(timm_model, "global_pool", None) == "map":
-        raise ValueError(
-            f"{vit_name} is not supported in transformers because it's a SigLIP style ViT with attn_pool."
-        )
+        raise ValueError(f"{vit_name} is not supported in transformers because it's a SigLIP style ViT with attn_pool.")
 
     # use of layer scale in ViT model blocks
     if not isinstance(getattr(timm_model.blocks[0], "ls1", None), torch.nn.Identity) or not isinstance(
