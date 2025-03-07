@@ -116,7 +116,7 @@ Based on the command-line arguments, the output directory is built as follows:
 │       ├── error.log
 │       ├── results.json
 │       └── failure.json
-├── ablation/
+├── ablations/
 │   └── <DATASET>_km_closest_<LLM_FPS>_<DROPPING_POSITION>_<RETENTION_RATE*100>%_<HYPERPARAM>/
 │       ├── output.out
 │       ├── evaluation.log
@@ -142,9 +142,13 @@ Based on the command-line arguments, the output directory is built as follows:
 Note: The folder chosen depends on the following logic in the bash script:
 
 If SAMPLER_TYPE is None, the results go under the baseline folder.
+
 If SAMPLER_TYPE is km_closest and HYPERPARAM is not 0.5, the results go under the ablation folder.
+
 If DATASET is charades, the results go under the charades folder.
+
 If DATASET is perceptiontest, the results go under the perceptiontest folder.
+
 Within that folder, the subdirectory is named as:
 <DATASET>_<SAMPLER_TYPE>_<LLM_FPS>_<DROPPING_POSITION>_<RETENTION_RATE*100>%_<HYPERPARAM>
 
