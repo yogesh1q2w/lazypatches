@@ -29,7 +29,7 @@ DROPPING_POSITION = int(sys.argv[6])
 # argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
 
 TARGET_PATH = f"/home/atuin/g102ea/shared/group_10/results/"
-# TARGET_PATH = f"." # for debugging purposes
+# TARGET_PATH = f"." # for debugging
 
 if SAMPLER_TYPE == "None":
     TARGET_PATH = os.path.join(TARGET_PATH, "baseline")
@@ -100,8 +100,8 @@ failed_indices = []
 
 for step, data in enumerate(data_loader):
 
-    if step == 4:
-        break
+    # if step == 4:   # for debugging
+    #     break
 
     if DATASET == "charades":
         idx, video, question, answer = data
