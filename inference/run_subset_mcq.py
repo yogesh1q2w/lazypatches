@@ -27,7 +27,22 @@ DROPPING_POSITION = int(sys.argv[6])
 
 # argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
 
-TARGET_PATH = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
+TARGET_PATH = f"/home/atuin/g102ea/shared/group_10/results/"
+
+if SAMPLER_TYPE == "None":
+    TARGET_PATH = os.path.join(TARGET_PATH, 'baseline')
+
+elif SAMPLER_TYPE == "km_closest" and HYPERPARAM!=0.5:
+    TARGET_PATH = os.path.join(TARGET_PATH, 'ablation')
+
+elif DATASET == "charades":
+    TARGET_PATH = os.path.join(TARGET_PATH, 'charades')
+
+elif DATASET == "perceptiontest":
+    TARGET_PATH = os.path.join(TARGET_PATH, 'perceptiontest')
+
+SUB_FOLDER = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
+TARGET_PATH = os.path.join(TARGET_PATH, SUB_FOLDER)
 
 logging.basicConfig(
     level=logging.INFO,
