@@ -792,7 +792,6 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
             )
 
         bsz, q_len, _ = hidden_states.size()
-        import pdb;
         query_states = self.q_proj(hidden_states)
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
@@ -1218,7 +1217,6 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                 if video_mask.any().item():
                     hidden_states, video_mask, sampling_mask = self.sampler(hidden_states, video_mask, position_ids, input_ids)
                     print(f'>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<')
-                    # import pdb; pdb.set_trace()
                 else:
                     pass
                 
@@ -1776,8 +1774,6 @@ class Qwen2VLForConditionalGeneration(Qwen2VLPreTrainedModel, GenerationMixin):
             if pixel_values_videos is not None:
                 pixel_values_videos = pixel_values_videos.type(self.visual.get_dtype())
                 video_embeds = self.visual(pixel_values_videos, grid_thw=video_grid_thw)
-                # import pdb
-                # pdb.set_trace()
                 video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw = fps_reduction(video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw, llm_fps=LLM_FPS, video_token_id=self.config.video_token_id)
                 n_video_tokens = (input_ids == self.config.video_token_id).sum().item()
                 n_video_features = video_embeds.shape[0]

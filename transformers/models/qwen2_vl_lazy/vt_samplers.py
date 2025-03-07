@@ -3,7 +3,6 @@ import torch
 import torch.nn.functional as F
 import abc
 import random
-import pdb
 
 class Sampler(abc.ABC):
     def __init__(self, sampler_name):
@@ -178,7 +177,6 @@ class KMclosestTokenSampler(Sampler):
                 mask = torch.tensor([idx not in selected_video for idx in remaining_video_indices.tolist()], device=hidden_states.device, dtype=torch.bool)
                 remaining_video_indices = remaining_video_indices[mask]
 
-            # pdb.set_trace()
             # Update sampling mask: zero out unselected video tokens
             selected_video = torch.tensor(list(selected_video), device=hidden_states.device)
             sampling_mask[b, video_indices] = False  # Mask out all video tokens initially

@@ -4,8 +4,6 @@ from inference.utils.vision_process import FPS, smart_nframes
 
 
 def fps_reduction(video_embeds, input_ids, inputs_embeds, attention_mask, video_grid_thw, llm_fps, video_token_id):
-    # import pdb
-    # pdb.set_trace()
     assert video_grid_thw.shape[0] == 1  # currently only handles batch size 1
     D = video_embeds.shape[-1]
     nframes, _, _ = video_grid_thw[0]
