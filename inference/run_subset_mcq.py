@@ -28,7 +28,6 @@ DROPPING_POSITION = int(sys.argv[6])
 # argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
 
 TARGET_PATH = f"{DATASET}_{SAMPLER_TYPE}_{LLM_FPS}_{DROPPING_POSITION}_{int(RETENTION_RATE*100)}%_{HYPERPARAM}"
-os.mkdir(TARGET_PATH)
 
 logging.basicConfig(
     level=logging.INFO,
@@ -89,8 +88,9 @@ for step, data in enumerate(data_loader):
         idx, video, question, answer = data
     elif DATASET == "perceptiontest":
         idx, video, question, answer, area, tag = data
-        print(area, tag)
-
+        area = area[0]
+        tag = [i[0] for i in tag]
+        
     idx = idx[0]
     video = video.squeeze(0)
     question = question[0]
