@@ -4,9 +4,10 @@ import torch
 import json
 import logging
 import time
-from transformers.models.qwen2_vl_lazy import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
-
 from torch.utils.data import DataLoader
+
+from transformers.models.qwen2_vl_lazy import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
+from eval.accuracy_mcq import IncrementalMCQAcc
 from dataset.sub_charades_action import Sub_CharadesActionMCQ
 from dataset.sub_perceptiontest import SubPerceptiontestMCQ
 
@@ -87,11 +88,7 @@ processor = Qwen2VLProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 
 print("Loading model complete", flush=True)
 
-
-def normalize_text(text):
-    """Normalize text for comparison"""
-    return text.strip().lower() if isinstance(text, str) else ""
-
+metrics = IncrementalMCQAcc(DATASET)
 
 data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
 print("Length of dataset: ", len(dataset), flush=True)
@@ -99,13 +96,18 @@ results = []
 failed_indices = []
 
 for step, data in enumerate(data_loader):
+
+    if step == 4:
+        break
+
     if DATASET == "charades":
         idx, video, question, answer = data
+        area, tag = None, None
     elif DATASET == "perceptiontest":
         idx, video, question, answer, area, tag = data
         area = area[0]
         tag = [i[0] for i in tag]
-        
+
     idx = idx[0]
     video = video.squeeze(0)
     question = question[0]
@@ -130,22 +132,13 @@ for step, data in enumerate(data_loader):
         generated_ids = [output_ids[len(input_ids) :] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
         output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
 
-        print(int(idx), output_text[0], flush=True)
-        print(answer, flush=True)
+        print(f"{idx} {question}", flush=True)
+        print(f"Correct answer = {answer}", flush=True)
+        print(f"Output answer = {output_text[0]}", flush=True)
         print("-------------------", flush=True)
 
-        # Evaluate correctness
-        pred = normalize_text(output_text[0]) if isinstance(output_text, list) and output_text else ""
-        gt = normalize_text(answer)
-        is_correct = any(
-            [
-                gt in pred,  # Check if answer is substring of prediction
-                pred == gt,  # Exact match
-                pred.startswith(gt.split()[0]),  # Handle partial matches
-            ]
-        )
+        is_correct = metrics.eval_results(answer, output_text[0], area, tag)
 
-        # Store results
         results.append(
             {
                 "idx": int(idx),
@@ -165,10 +158,11 @@ for step, data in enumerate(data_loader):
     if step % SAVE_EVERY == 0:
         json.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
         json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
-        print(f"saved till step {step}", file=sys.stderr)
+        logger.info(f"---Saved till step {step}----")
 
-        current_accuracy = sum(r["is_correct"] for r in results) / len(results) if len(results) > 0 else 0
-        logger.info(f"Processed {step}/{len(dataset)} - Current ACC: {current_accuracy:.4f}")
+        logger.info(
+            f"Processed {step}/{len(dataset)} - Current Accuracy: {metrics.get_total_accuracy():.4f} ({metrics.total['correct']}/{metrics.total['answered']}), Failed = {len(failed_indices)}"
+        )
 
     torch.cuda.empty_cache()
 
@@ -176,15 +170,16 @@ json.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
 json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
 
 
-# Calculate final metrics
-correct = sum(r["is_correct"] for r in results)
-total = len(results)  # Only successful samples
-total_attempts = total + len(failed_indices)  # Include failed attempts
-accuracy = correct / total if total > 0 else 0
+print("-------------------", flush=True)
+correct = metrics.total["correct"]
+total_attempts = metrics.total["answered"] + len(failed_indices)
 failure_rate = len(failed_indices) / total_attempts if total_attempts > 0 else 0
-
 logger.info("\nFinal Evaluation Results:")
 logger.info(f"Processed Samples: {total_attempts}")
 logger.info(f"Failed Samples: {len(failed_indices)}")
-logger.info(f"Accuracy: {accuracy:.4f} ({correct}/{total})")
+logger.info(f"Accuracy: {metrics.get_total_accuracy():.4f} ({metrics.total['correct']}/{metrics.total['answered']})")
 logger.info(f"Failure Rate: {failure_rate:.4f}")
+if DATASET == "perceptiontest":
+    area_accuracy, tag_accuracy = metrics.get_area_and_tag_accuracy()
+    logger.info(f"Area accuracy = {area_accuracy}")
+    logger.info(f"Tag accuracy = {tag_accuracy}")

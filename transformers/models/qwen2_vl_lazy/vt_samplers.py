@@ -41,7 +41,7 @@ class UniformSampler(Sampler):
         hidden_states = hidden_states * sampling_mask.float()
         video_mask = video_mask & sampling_mask
 
-        print(f"SAMPLING RATE FOR EXPERIMENT IS {(1-self.retain_proportion)*100}%")
+        print(f"SAMPLING RATE FOR UNIFORM IS {(1-self.retain_proportion)*100}%")
 
         return hidden_states, video_mask, sampling_mask
 
@@ -90,7 +90,7 @@ class SpatioTemporalHeuristicSampler(Sampler):
         hidden_states = hidden_states * sampling_mask.unsqueeze(-1)
         video_mask = video_mask & sampling_mask.unsqueeze(-1)
 
-        print(f"SAMPLING RATE FOR EXPERIMENT IS {(1-self.retain_proportion)*100}%")
+        print(f"SAMPLING RATE FOR GAUSSIAN(sigma_t={self.temporal_variance}, sigma_s={self.spatial_variance}) IS {(1-self.retain_proportion)*100}%")
 
         return hidden_states, video_mask, sampling_mask
 
@@ -182,6 +182,6 @@ class KMclosestTokenSampler(Sampler):
         hidden_states = hidden_states * sampling_mask.float()
         video_mask = video_mask & sampling_mask
 
-        print(f"SAMPLING RATE FOR EXPERIMENT IS {(1-self.retain_proportion)*100}%")
+        print(f"SAMPLING RATE FOR KM-CLOSEST(k={self.k}) IS {(1-self.retain_proportion)*100}%")
 
         return hidden_states, video_mask, sampling_mask

@@ -182,7 +182,6 @@ def _read_video_torchvision(
             warnings.warn("torchvision < 0.19.0 does not support http/https video path, please upgrade to 0.19.0.")
         if "file://" in video_path:
             video_path = video_path[7:]
-    st = time.time()
     video, audio, info = io.read_video(
         video_path,
         start_pts=ele.get("video_start", 0.0),
@@ -191,7 +190,7 @@ def _read_video_torchvision(
         output_format="TCHW",
     )
     total_frames, video_fps = video.size(0), info["video_fps"]
-    logger.info(f"torchvision:  {video_path=}, {total_frames=}, {video_fps=}, time={time.time() - st:.3f}s")
+    logger.info(f"Reading video:  {video_path=}, {total_frames=}, {video_fps=}")
     nframes = smart_nframes(ele, total_frames=total_frames, video_fps=video_fps)
     idx = torch.linspace(0, total_frames - 1, nframes).round().long()
     video = video[idx]

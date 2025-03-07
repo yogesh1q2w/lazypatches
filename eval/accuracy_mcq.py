@@ -47,7 +47,7 @@ SUB_TAGS = [
 
 
 def extract_characters_regex(s, option_regex):
-    s = s.strip()
+    s = s.strip().upper()
     answer_prefixes = [
         "The best answer is",
         "The correct answer is",
@@ -61,13 +61,13 @@ def extract_characters_regex(s, option_regex):
         "The correct option",
     ]
     for answer_prefix in answer_prefixes:
-        s = s.replace(answer_prefix, "")
+        s = s.replace(answer_prefix.upper(), "")
 
     if len(s.split()) > 10 and not re.search(f"[{option_regex}]", s):
-        return ""
+        return option_regex[0]  # default to first option
     matches = re.search(rf"[{option_regex}]", s)
     if matches is None:
-        return ""
+        return option_regex[0]
     return matches[0]
 
 
@@ -84,39 +84,28 @@ class IncrementalMCQAcc:
         for tag in SUB_TAGS:
             self.q_tags[tag] = {"correct": 0, "answered": 0}
 
-    def eval_results(self, gt_answer, your_answer, q_area, q_tag):
-
-        response = your_answer
-
-        # Extract the answer from the response
-        extration = extract_characters_regex(response, self.option_regex)
-
-        if extration != "":
+    def eval_results(self, gt_answer, response, q_area=None, q_tag=None):
+        extracted_answer = extract_characters_regex(response, self.option_regex)
+        self.total["answered"] += 1
+        self.total["correct"] += extracted_answer == gt_answer
+        if q_area is not None and q_tag is not None:
             self.q_areas[q_area]["answered"] += 1
-            self.q_areas[q_area]["correct"] += extration == gt_answer
+            self.q_areas[q_area]["correct"] += extracted_answer == gt_answer
             for tag in q_tag:
                 self.q_tags[tag]["answered"] += 1
-                self.q_tags[tag]["correct"] += extration == gt_answer
+                self.q_tags[tag]["correct"] += extracted_answer == gt_answer
+        return extracted_answer == gt_answer
 
-    def print_areas_acc(self):
-        print("=========Area Evaluation=========")
+    def get_area_and_tag_accuracy(self):
+        area_accuracy = {}
         for area, data in self.q_areas.items():
-            print(
-                f"Accuracy in arae {area} is: {100 * data['correct'] / data['answered'] if data['answered'] > 0 else 0 : .1f}% \
-                ({data['correct']}/{data['answered']})"
-            )
+            area_accuracy[area] = 100 * data["correct"] / data["answered"] if data["answered"] > 0 else 0
 
-    def print_tags_acc(self):
-        print("=========Tags Evaluation=========")
+        tag_accuracy = {}
         for tag, data in self.q_tags.items():
-            print(
-                f"Accuracy in arae {tag} is: {100 * data['correct'] / data['answered'] if data['answered'] > 0 else 0 : .1f}% \
-                ({data['correct']}/{data['answered']})"
-            )
+            tag_accuracy[tag] = 100 * data["correct"] / data["answered"] if data["answered"] > 0 else 0
 
-    def print_total_acc(self):
-        print("=========Tatol Evaluation=========")
-        print(
-            f"Accuracy in total questions is: {100 * self.total['correct'] / self.total['answered'] if self.total['answered'] > 0 else 0 : .1f}% \
-            ({self.total['correct']} / {self.total['answered']})"
-        )
+        return area_accuracy, tag_accuracy
+
+    def get_total_accuracy(self):
+        return 100 * self.total["correct"] / self.total["answered"] if self.total["answered"] > 0 else 0
