@@ -11,18 +11,17 @@ from dataset.sub_charades_action import Sub_CharadesActionMCQ
 from dataset.sub_perceptiontest import SubPerceptiontestMCQ
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-SAVE_EVERY = 10
+SAVE_EVERY = 100
 
 MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
 
-DATASET = "perceptiontest"
+DATASET = sys.argv[4].lower()
 ROOT_PATH = "/home/atuin/g102ea/shared/group_10/datasets"
 DATASET_PATH = os.path.join(ROOT_PATH, DATASET)
 
 LLM_FPS = float(sys.argv[1])
 RETENTION_RATE = float(sys.argv[2])
 SAMPLER_TYPE = sys.argv[3]
-DATASET = sys.argv[4]
 HYPERPARAM = float(sys.argv[5])
 DROPPING_POSITION = int(sys.argv[6])
 
@@ -43,9 +42,9 @@ logger = logging.getLogger(__name__)
 RELOAD=True
 if DATASET == "charades":
     if RELOAD:
-        dataset = Sub_CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json", reload=RELOAD)
+        dataset = Sub_CharadesActionMCQ(dataset_path=os.path.join(DATASET_PATH, "subset_charades_mcq.json"), reload=RELOAD)
     else:
-        dataset = Sub_CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json",
+        dataset = Sub_CharadesActionMCQ(dataset_path=os.path.join(DATASET_PATH, "subset_charades_mcq.json"),
                                         videos_path=os.path.join(DATASET_PATH, "videos/Charades_v1"),
                                         labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
                                         classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
@@ -54,22 +53,18 @@ if DATASET == "charades":
                                         )
 elif DATASET == "perceptiontest":
     if RELOAD:
-        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/sub_perceptiontest_mcq.json", reload=RELOAD)
+        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path=os.path.join(DATASET_PATH, "sub_perceptiontest_mcq.json"), reload=RELOAD)
     else:
-        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/sub_perceptiontest_mcq.json",
+        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path=os.path.join(DATASET_PATH, "sub_perceptiontest_mcq.json"),
                                         videos_path=os.path.join(DATASET_PATH, "valid/videos"),
                                         labels_path=os.path.join(DATASET_PATH, "valid/all_valid.json"),
-                                        # classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
-                                        # n_wrong_options=4,
                                         reload=RELOAD
                                         )
 
-# Load the model in half-precision on the available device(s)
 model = Qwen2VLForConditionalGeneration.from_pretrained(MODEL_CHECKPOINT_PATH, device_map="auto", torch_dtype="auto")
 processor = Qwen2VLProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 
 print("Loading model complete", flush=True)
-print("random")
 
 def normalize_text(text):
     """Normalize text for comparison"""
@@ -81,8 +76,6 @@ results = []
 failed_indices = []
 
 for step, data in enumerate(data_loader):
-    start_time = time.time()  # <-- Start timer
-    
     if DATASET == "charades":
         idx, video, question, answer = data
     elif DATASET == "perceptiontest":
@@ -111,8 +104,7 @@ for step, data in enumerate(data_loader):
         output_ids = model.generate(**inputs, max_new_tokens=128)
         generated_ids = [output_ids[len(input_ids):] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
         output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
-        end_time = time.time()  # <-- End timer
-        elapsed_time = end_time - start_time  # <-- Calculate time
+        
         print(int(idx), output_text[0], flush=True)
         print(answer, flush=True)
         print("-------------------", flush=True)
@@ -133,22 +125,22 @@ for step, data in enumerate(data_loader):
             "answer": answer,
             "prediction": output_text,
             "is_correct": is_correct,
-            "processing_time": elapsed_time  # <-- Store processing time
         })
         torch.cuda.empty_cache()
+        
     except Exception as e:
         logger.info(f'Exception thrown is {e}')
         failed_indices.append(int(idx))
         torch.cuda.empty_cache()
-    
-    if step % 10 == 0:
-        current_accuracy = sum(r["is_correct"] for r in results) / len(results) if len(results) > 0 else 0
-        logger.info(f"Processed {step}/{len(dataset)} - Current ACC: {current_accuracy:.4f}")
 
     if step % SAVE_EVERY == 0:
         json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
         json.dump(failed_indices, open(os.path.join(TARGET_PATH,"failed_indices.json"), "w"))
         print(f"saved till step {step}", file=sys.stderr)
+        
+        current_accuracy = sum(r["is_correct"] for r in results) / len(results) if len(results) > 0 else 0
+        logger.info(f"Processed {step}/{len(dataset)} - Current ACC: {current_accuracy:.4f}")
+        
     torch.cuda.empty_cache()
     
 json.dump(results, open(os.path.join(TARGET_PATH,"results.json"), "w"))
@@ -160,10 +152,10 @@ correct = sum(r["is_correct"] for r in results)
 total = len(results)  # Only successful samples
 total_attempts = total + len(failed_indices)  # Include failed attempts
 accuracy = correct / total if total > 0 else 0
-error_rate = len(failed_indices) / total_attempts if total_attempts > 0 else 0
+failure_rate = len(failed_indices) / total_attempts if total_attempts > 0 else 0
 
 logger.info("\nFinal Evaluation Results:")
 logger.info(f"Processed Samples: {total_attempts}")
 logger.info(f"Failed Samples: {len(failed_indices)}")
 logger.info(f"Accuracy: {accuracy:.4f} ({correct}/{total})")
-logger.info(f"Error Rate: {error_rate:.4f}")
+logger.info(f"Failure Rate: {failure_rate:.4f}")
