@@ -20,7 +20,7 @@ source .env/bin/activate
 
 # [LLM_FPS] : [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2]; CHANGES ONLY FOR BASELINE W/O SAMPLING + ANALYSIS EXP FOR BEST SAMPLING RATE + SAMPLING POSITION
 # [RETENTION_RATE] : [.10, .30, .50, .70, .90] CHANGES FOR ALL EXPERIMENTS BAR BEST SAMPLING RATE EXPERIMENT
-# [SAMPLER_TYPE] : [uniform, st_gaussian, km_closest] 
+# [SAMPLER_TYPE] : [None, uniform, st_gaussian, km_closest] 
 # [DATASET] : [Charades, PerceptionTest]
 # [HYPERPARAM] : 
 # --For uniform sampler: [0]
@@ -29,15 +29,18 @@ source .env/bin/activate
 # [DROPPING_POSITION] : [0, 12, 24] 
 
 # Example commands: 
+# --no sampler:
+#       sbatch launch_job/run_mcq.sh 1.0 0 None Charades 0 0 
+#       {Dataset is Charades, Hyperparam is 0, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
 # --uniform sampler: 
 #       sbatch launch_job/run_mcq.sh 1.0 .50 uniform Charades 0 0 
-#       {Dataset is Charades, Hyperparam  is 0, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
+#       {Dataset is Charades, Hyperparam is 0, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
 # --st_gaussian sampler: 
 #       sbatch launch_job/run_mcq.sh 1.0 .50 st_gaussian Charades 1 0 
-#       {Dataset is Charades, Hyperparam  is 1, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
+#       {Dataset is Charades, Hyperparam is 1, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
 # --km_closest sampler: 
 #       sbatch launch_job/run_mcq.sh 1.0 .50 km_closest Charades 0.50 0 
-#       {Dataset is Charades, Hyperparam  is 0.5, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
+#       {Dataset is Charades, Hyperparam is 0.5, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
 
 TARGET_PATH="/home/atuin/g102ea/shared/group_10/results"
 
