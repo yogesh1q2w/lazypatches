@@ -5,40 +5,41 @@ import json
 from transformers import Qwen2VLForConditionalGeneration, AutoProcessor
 
 from torch.utils.data import DataLoader
-from dataset.perceptiontest_mcq import PerceptiontestMCQ
+from dataset.sub_charades_action import Sub_CharadesActionMCQ
+from dataset.sub_perceptiontest import SubPerceptiontestMCQ
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SAVE_EVERY = 100
 
 MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
-
+DATASET = "perceptiontest"
 ROOT_PATH = "/home/atuin/g102ea/shared/group_10/datasets"
-DATASET_PATH = os.path.join(ROOT_PATH, "perceptiontest")
+DATASET_PATH = os.path.join(ROOT_PATH, DATASET)
 
 
-# RELOAD=True
-# if RELOAD:
-#     charades_dataset = CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/datasets/charades/charades_mcq.json", reload=RELOAD)
-# else:
-#     charades_dataset = CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/datasets/charades/charades_mcq.json",
-#                                     videos_path=os.path.join(DATASET_PATH, "videos/Charades_v1"),
-#                                     labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
-#                                     classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
-#                                     n_wrong_options=4,
-#                                     reload=RELOAD
-#                                     )
-
-RELOAD=False
-if RELOAD:
-    perceptiontest_dataset = PerceptiontestMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/perceptiontest_mcq.json", reload=RELOAD)
-else:
-    perceptiontest_dataset = PerceptiontestMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/perceptiontest_mcq.json",
-                                    videos_path=os.path.join(DATASET_PATH, "valid/videos"),
-                                    labels_path=os.path.join(DATASET_PATH, "valid/all_valid.json"),
-                                    # classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
-                                    # n_wrong_options=4,
-                                    reload=RELOAD
-                                    )
+RELOAD=True
+if DATASET == "charades":
+    if RELOAD:
+        dataset = Sub_CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json", reload=RELOAD)
+    else:
+        dataset = Sub_CharadesActionMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_mcq.json",
+                                        videos_path=os.path.join(DATASET_PATH, "videos/Charades_v1"),
+                                        labels_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_test.csv"),
+                                        classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
+                                        n_wrong_options=4,
+                                        reload=RELOAD
+                                        )
+elif DATASET == "perceptiontest":
+    if RELOAD:
+        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/sub_perceptiontest_mcq.json", reload=RELOAD)
+    else:
+        perceptiontest_dataset = SubPerceptiontestMCQ(dataset_path="/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/sub_perceptiontest_mcq.json",
+                                        videos_path=os.path.join(DATASET_PATH, "valid/videos"),
+                                        labels_path=os.path.join(DATASET_PATH, "valid/all_valid.json"),
+                                        # classes_path=os.path.join(DATASET_PATH, "anotations/Charades/Charades_v1_classes.txt"),
+                                        # n_wrong_options=4,
+                                        reload=RELOAD
+                                        )
 
 # Load the model in half-precision on the available device(s)
 model = Qwen2VLForConditionalGeneration.from_pretrained(MODEL_CHECKPOINT_PATH, device_map="auto", torch_dtype="auto")
@@ -46,13 +47,17 @@ processor = AutoProcessor.from_pretrained(MODEL_CHECKPOINT_PATH)
 
 print("Loading model complete", flush=True)
 
-data_loader = DataLoader(dataset=perceptiontest_dataset, batch_size=1, shuffle=False)
-print("Length of dataset: ", len(perceptiontest_dataset), flush=True)
+data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
+print("Length of dataset: ", len(dataset), flush=True)
 results = []
 failed_indices = []
 
 for step, data in enumerate(data_loader):
-    idx, video, question, answer = data
+    
+    if DATASET == "charades":
+        idx, video, question, answer = data
+    elif DATASET == "perceptiontest":
+        idx, video, question, answer, area, tag = data
 
     idx = idx[0]
     video = video.squeeze(0)
