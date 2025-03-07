@@ -5,7 +5,6 @@ import logging
 import math
 import os
 import sys
-import time
 import warnings
 from functools import lru_cache
 from io import BytesIO
@@ -101,7 +100,6 @@ def fetch_image(ele: dict[str, str | Image.Image], size_factor: int = IMAGE_FACT
     if image_obj is None:
         raise ValueError(f"Unrecognized image input, support local path, http url, base64 and PIL.Image, got {image}")
     image = image_obj.convert("RGB")
-    ## resize
     if "resized_height" in ele and "resized_width" in ele:
         resized_height, resized_width = smart_resize(
             ele["resized_height"],
@@ -197,76 +195,15 @@ def _read_video_torchvision(
     return video
 
 
-def is_decord_available() -> bool:
-    import importlib.util
-
-    return importlib.util.find_spec("decord") is not None
-
-
-def _read_video_decord(
-    ele: dict,
-) -> torch.Tensor:
-    """read video using decord.VideoReader
-
-    Args:
-        ele (dict): a dict contains the configuration of video.
-        support keys:
-            - video: the path of video. support "file://", "http://", "https://" and local path.
-            - video_start: the start time of video.
-            - video_end: the end time of video.
-    Returns:
-        torch.Tensor: the video tensor with shape (T, C, H, W).
-    """
-    import decord
-
-    video_path = ele["video"]
-    st = time.time()
-    vr = decord.VideoReader(video_path)
-    # TODO: support start_pts and end_pts
-    if "video_start" in ele or "video_end" in ele:
-        raise NotImplementedError("not support start_pts and end_pts in decord for now.")
-    total_frames, video_fps = len(vr), vr.get_avg_fps()
-    logger.info(f"decord:  {video_path=}, {total_frames=}, {video_fps=}, time={time.time() - st:.3f}s")
-    nframes = smart_nframes(ele, total_frames=total_frames, video_fps=video_fps)
-    idx = torch.linspace(0, total_frames - 1, nframes).round().long().tolist()
-    video = vr.get_batch(idx).asnumpy()
-    video = torch.tensor(video).permute(0, 3, 1, 2)  # Convert to TCHW format
-    return video
-
-
-VIDEO_READER_BACKENDS = {
-    "decord": _read_video_decord,
-    "torchvision": _read_video_torchvision,
-}
-
-FORCE_QWENVL_VIDEO_READER = os.getenv("FORCE_QWENVL_VIDEO_READER", None)
-
-
-@lru_cache(maxsize=1)
-def get_video_reader_backend() -> str:
-    if FORCE_QWENVL_VIDEO_READER is not None:
-        video_reader_backend = FORCE_QWENVL_VIDEO_READER
-    elif is_decord_available():
-        video_reader_backend = "decord"
-    else:
-        video_reader_backend = "torchvision"
-    print(f"qwen-vl-utils using {video_reader_backend} to read video.", file=sys.stderr)
-    return video_reader_backend
-
 
 def fetch_video(ele: dict, image_factor: int = IMAGE_FACTOR) -> torch.Tensor | list[Image.Image]:
     if isinstance(ele["video"], str):
-        video_reader_backend = get_video_reader_backend()
-        video = VIDEO_READER_BACKENDS[video_reader_backend](ele)
+        video = _read_video_torchvision(ele)
         nframes, _, height, width = video.shape
-        # print(f"Original video shape = {video.shape}")
-        # print(f'FPS FOR CURRENT EXPERIMENT IS {FPS}')
-
         min_pixels = ele.get("min_pixels", VIDEO_MIN_PIXELS)
         total_pixels = ele.get("total_pixels", VIDEO_TOTAL_PIXELS)
         max_pixels = max(min(VIDEO_MAX_PIXELS, total_pixels / nframes * FRAME_FACTOR), int(min_pixels * 1.05))
         max_pixels = ele.get("max_pixels", max_pixels)
-        # print(min_pixels, max_pixels)
         if "resized_height" in ele and "resized_width" in ele:
             resized_height, resized_width = smart_resize(
                 ele["resized_height"],
@@ -281,14 +218,12 @@ def fetch_video(ele: dict, image_factor: int = IMAGE_FACTOR) -> torch.Tensor | l
                 min_pixels=min_pixels,
                 max_pixels=max_pixels,
             )
-        # print(resized_height, resized_width)
         video = transforms.functional.resize(
             video,
             [resized_height, resized_width],
             interpolation=InterpolationMode.BICUBIC,
             antialias=True,
         ).float()
-        # print(video.shape)
         return video
     else:
         assert isinstance(ele["video"], (list, tuple))
@@ -303,42 +238,3 @@ def fetch_video(ele: dict, image_factor: int = IMAGE_FACTOR) -> torch.Tensor | l
         if len(images) < nframes:
             images.extend([images[-1]] * (nframes - len(images)))
         return images
-
-
-def extract_vision_info(conversations: list[dict] | list[list[dict]]) -> list[dict]:
-    vision_infos = []
-    if isinstance(conversations[0], dict):
-        conversations = [conversations]
-    for conversation in conversations:
-        for message in conversation:
-            if isinstance(message["content"], list):
-                for ele in message["content"]:
-                    if (
-                        "image" in ele
-                        or "image_url" in ele
-                        or "video" in ele
-                        or ele["type"] in ("image", "image_url", "video")
-                    ):
-                        vision_infos.append(ele)
-    return vision_infos
-
-
-def process_vision_info(
-    conversations: list[dict] | list[list[dict]],
-) -> tuple[list[Image.Image] | None, list[torch.Tensor | list[Image.Image]] | None]:
-    vision_infos = extract_vision_info(conversations)
-    ## Read images or videos
-    image_inputs = []
-    video_inputs = []
-    for vision_info in vision_infos:
-        if "image" in vision_info or "image_url" in vision_info:
-            image_inputs.append(fetch_image(vision_info))
-        elif "video" in vision_info:
-            video_inputs.append(fetch_video(vision_info))
-        else:
-            raise ValueError("image, image_url or video should in content.")
-    if len(image_inputs) == 0:
-        image_inputs = None
-    if len(video_inputs) == 0:
-        video_inputs = None
-    return image_inputs, video_inputs
