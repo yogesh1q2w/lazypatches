@@ -51,7 +51,7 @@ from ...utils import (
     replace_return_docstrings,
 )
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
-from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler
+from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler, KMclosestTokenSampler
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -495,7 +495,7 @@ class Qwen2VLAttention(nn.Module):
     and "Generating Long Sequences with Sparse Transformers".
     """
 
-    def __init__(self, config: Qwen2VLConfig(selector_implementation =  SAMPLER_TYPE, retain_proportion = RETENTION_RATE ), layer_idx: Optional[int] = None):
+    def __init__(self, config: Qwen2VLConfig, layer_idx: Optional[int] = None):
         super().__init__()
         self.config = config
         self.layer_idx = layer_idx
@@ -885,10 +885,11 @@ QWEN2_VL_ATTENTION_CLASSES = {
 QWEN2_VL_SAMPLER_CLASSES = {
     "uniform" : UniformSampler,
     "st_gaussian" : SpatioTemporalHeuristicSampler,
+    "km_closest" : KMclosestTokenSampler,
 }
 
 class Qwen2VLDecoderLayer(nn.Module):
-    def __init__(self, config: Qwen2VLConfig(selector_implementation =  SAMPLER_TYPE, retain_proportion = RETENTION_RATE ), layer_idx: int):
+    def __init__(self, config: Qwen2VLConfig, layer_idx: int):
         super().__init__()
         self.hidden_size = config.hidden_size
 
@@ -995,7 +996,7 @@ QWEN2VL_START_DOCSTRING = r"""
     QWEN2VL_START_DOCSTRING,
 )
 class Qwen2VLPreTrainedModel(PreTrainedModel):
-    config_class = Qwen2VLConfig(selector_implementation =  SAMPLER_TYPE, retain_proportion = RETENTION_RATE )
+    config_class = Qwen2VLConfig
     base_model_prefix = "model"
     supports_gradient_checkpointing = True
     _no_split_modules = ["Qwen2VLDecoderLayer", "Qwen2VLVisionBlock"]
@@ -1219,8 +1220,7 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
                     # import pdb; pdb.set_trace()
                 else:
                     pass
-                    # print(f'<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<No Video Mask at layer {idx}!!!>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>')
-            
+                
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
 

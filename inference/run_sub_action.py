@@ -18,18 +18,13 @@ MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qw
 ROOT_PATH = "/home/atuin/g102ea/g102ea12/dataset"
 DATASET_PATH = os.path.join(ROOT_PATH, "charades")
 
-FPS = 1.0
-RETENTION_RATE = 1.0
-SAMPLER_TYPE = None
+FPS = float(sys.argv[1])
+RETENTION_RATE = float(sys.argv[2])
+SAMPLER_TYPE = sys.argv[3]
+DATASET = sys.argv[4]
+HYPERPARAM = sys.argv[5]
 
-if len(sys.argv) > 1:
-    FPS = float(sys.argv[1])
-if len(sys.argv) > 2:
-    RETENTION_RATE = float(sys.argv[2])
-if len(sys.argv) > 3:
-    SAMPLER_TYPE = sys.argv[3]
-
-TARGET_PATH = f"{SAMPLER_TYPE}@{int(100-RETENTION_RATE*100)}%_{FPS}FPS"
+TARGET_PATH = f"{DATASET}_{SAMPLER_TYPE}_{FPS}_{int(100-RETENTION_RATE*100)}%_{HYPERPARAM}"
 
 logging.basicConfig(
     level=logging.INFO,
@@ -126,7 +121,8 @@ for step, data in enumerate(data_loader):
             "processing_time": elapsed_time  # <-- Store processing time
         })
         torch.cuda.empty_cache()
-    except:
+    except Exception as e:
+        logger.info(f'Exception thrown is {e}')
         failed_indices.append(int(idx))
         torch.cuda.empty_cache()
     
