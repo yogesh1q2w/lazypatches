@@ -5,7 +5,7 @@
 #SBATCH --job-name=run
 #SBATCH --export=None
 
-cd /home/hpc/g102ea/g102ea18/folder/lazypatches/
+cd /home/hpc/g102ea/appropriate_path/lazypatches/  # UPDATE ME! AND DON'T PUSH!
 module add python
 conda activate m3project
 source .env/bin/activate
