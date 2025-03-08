@@ -106,8 +106,9 @@ class KMclosestTokenSampler(Sampler):
     def sample(self, hidden_states, video_mask, position_ids, input_ids):
         batch_size, seq_len, d = hidden_states.shape
         video_positions = position_ids[:, video_mask.sum(axis=-1) > 0]
-        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)
+        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool, device=video_mask.device)
         video_seq_len = len(video_positions[0])
+        input_ids = input_ids.to(hidden_states.device)
 
         for b in range(batch_size):
             state_normalized = F.normalize(hidden_states[b])
@@ -115,7 +116,7 @@ class KMclosestTokenSampler(Sampler):
 
             assert torch.allclose(cosine_sim, cosine_sim.T, atol=1e-6), "Matrix is not symmetric"
             assert torch.allclose(
-                torch.diag(cosine_sim), torch.ones(seq_len), atol=1e-6
+                torch.diag(cosine_sim), torch.ones(seq_len, device=cosine_sim.device), atol=1e-6
             ), "Diagonal values are not all 1"
 
             cosine_dist = -1.0 * cosine_sim
