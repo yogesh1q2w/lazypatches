@@ -6,7 +6,7 @@ import torch.utils.data as data
 from inference.utils.vision_process import fetch_video
 
 
-Prompts_pre = f"Select the best answer to the following multiple-choice question based on the video. Respond with only the letter (A, B, C, or D) of the correct option."
+Prompts_pre = f"Select the best answer to the following multiple-choice question based on the video. Respond with only the letter (A, B, or C) of the correct option."
 Prompts_suf = f"The best answer is:"
 
 num_mapping = {0: "A", 1: "B", 2: "C"}
@@ -38,13 +38,7 @@ def parse_video_and_mcq_json(filename):
 
 class PerceptiontestMCQ(data.Dataset):
     def __init__(
-        self,
-        dataset_path=None,
-        videos_path=None,
-        labels_path=None,
-        reload=True,
-        use_subset=True,
-        target_fps=2.0
+        self, dataset_path=None, videos_path=None, labels_path=None, reload=True, use_subset=True, target_fps=2.0
     ):
         # give either already exisiting dataset or corresponding paths to build one
         if reload:
@@ -54,11 +48,13 @@ class PerceptiontestMCQ(data.Dataset):
             assert dataset_path is not None and videos_path is not None and labels_path is not None
 
             video_mcqs_info = parse_video_and_mcq_json(labels_path)
-            
+
             if use_subset:
-                with open("/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/subset_perceptiontest.json", "r") as f:
+                with open(
+                    "/home/atuin/g102ea/shared/group_10/datasets/perceptiontest/subset_perceptiontest.json", "r"
+                ) as f:
                     subset_data = json.load(f)
-                    
+
                 mcq_data = self.prepare(video_mcqs_info, videos_path, subset_data)
             else:
                 mcq_data = self.prepare(video_mcqs_info, videos_path)
@@ -77,7 +73,7 @@ class PerceptiontestMCQ(data.Dataset):
         video_ids = []
         mcqs = []
         mcq_labels = []
-        
+
         mcq_areas = []
         mcq_tags = []
 
@@ -111,7 +107,7 @@ class PerceptiontestMCQ(data.Dataset):
                     # (index) option_text"
                     answer_index = mcq["answer_id"]
                     mcq_labels.append(f"{num_mapping[answer_index]}")
-                    
+
                     mcq_areas.append(mcq["area"])
                     mcq_tags.append(mcq["tag"])
             else:
@@ -162,7 +158,7 @@ class PerceptiontestMCQ(data.Dataset):
         video_info = {"type": "video", "video": path, "fps": self.target_fps}
         video = fetch_video(video_info)
         question = self.data["mcq_data"]["mcqs"][index]
-        
+
         area = self.data["mcq_data"]["mcq_areas"][index]
         tag = self.data["mcq_data"]["mcq_tags"][index]
 
@@ -170,4 +166,3 @@ class PerceptiontestMCQ(data.Dataset):
 
     def __len__(self):
         return self.data["n_samples"]
-
