@@ -1117,7 +1117,11 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         self.norm = Qwen2RMSNorm(config.hidden_size, eps=config.rms_norm_eps)
         self.rotary_emb = Qwen2VLRotaryEmbedding(config=config)
 
-        self.sampler = None if config.selector_implementation == "None" else QWEN2_VL_SAMPLER_CLASSES[config.selector_implementation](config)
+        self.sampler = (
+            None
+            if config.selector_implementation == "None"
+            else QWEN2_VL_SAMPLER_CLASSES[config.selector_implementation](config)
+        )
         self.dropping_position = config.dropping_position
 
         self.gradient_checkpointing = False

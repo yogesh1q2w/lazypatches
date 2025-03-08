@@ -43,9 +43,7 @@ logger = logging.getLogger(__name__)
 RELOAD = True
 if DATASET == "charades":
     if RELOAD:
-        dataset = CharadesActionMCQ(
-            dataset_path=os.path.join(DATASET_PATH, "subset_charades_mcq.json"), reload=RELOAD
-        )
+        dataset = CharadesActionMCQ(dataset_path=os.path.join(DATASET_PATH, "subset_charades_mcq.json"), reload=RELOAD)
     else:
         dataset = CharadesActionMCQ(
             dataset_path=os.path.join(DATASET_PATH, "subset_charades_mcq.json"),

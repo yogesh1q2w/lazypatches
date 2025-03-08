@@ -30,6 +30,7 @@ def parse_video_action_csv(filename):
     labels = list(df.apply(lambda annot: extract_details(annot), axis=1))
     return labels
 
+
 def extract_subset_data(filename, sampled_data):
     df = pd.read_csv(filename)
 
@@ -102,14 +103,14 @@ class CharadesActionMCQ(data.Dataset):
             )
             labels = parse_video_action_csv(labels_path)
             action_id_mapping = parse_action_id_mapping(classes_path)
-            
+
             if use_subset:
                 with open("/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades.json", "r") as f:
                     subset_data = json.load(f)
 
                 subset_labels = extract_subset_data(labels_path, subset_data)
                 mcq_data = self.prepare(labels, action_id_mapping, n_wrong_options, videos_path, subset_labels)
-            else:    
+            else:
                 mcq_data = self.prepare(labels, action_id_mapping, n_wrong_options, videos_path)
 
             self.data = {

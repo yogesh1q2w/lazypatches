@@ -195,7 +195,6 @@ def _read_video_torchvision(
     return video
 
 
-
 def fetch_video(ele: dict, image_factor: int = IMAGE_FACTOR) -> torch.Tensor | list[Image.Image]:
     if isinstance(ele["video"], str):
         video = _read_video_torchvision(ele)
