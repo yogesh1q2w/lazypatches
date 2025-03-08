@@ -1,7 +1,7 @@
 #!/bin/bash -l
 #
 #SBATCH --gres=gpu:a100:1 -C a100_80
-#SBATCH --time=10:00:00 
+#SBATCH --time=20:00:00 
 #SBATCH --job-name=run
 #SBATCH --export=None
 
