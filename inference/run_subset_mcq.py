@@ -3,7 +3,7 @@ import sys
 import torch
 import json
 import logging
-import time
+import re
 from torch.utils.data import DataLoader
 
 from transformers.models.qwen2_vl_lazy import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
@@ -85,16 +85,20 @@ for step, data in enumerate(data_loader):
 
     if DATASET == "charades":
         idx, video, question, answer = data
+        question = question[0]
+        answer = answer[0]
+        answer = next(f"{i}" for i, t in re.findall(r"\((\d+)\) (.+)", question) if t.strip() == answer.strip())
         area, tag = None, None
+
     elif DATASET == "perceptiontest":
         idx, video, question, answer, area, tag = data
+        question = question[0]
+        answer = answer[0]
         area = area[0]
         tag = [i[0] for i in tag]
 
     idx = idx[0]
     video = video.squeeze(0)
-    question = question[0]
-    answer = answer[0]
 
     conversation = [
         {
