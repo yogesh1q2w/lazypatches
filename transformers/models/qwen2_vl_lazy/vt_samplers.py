@@ -178,6 +178,7 @@ class KMclosestTokenSampler(Sampler):
                 )
                 remaining_video_indices = remaining_video_indices[mask]
 
+            selected_video = set(video_indices) if len(selected_video) == 0 else selected_video
             selected_video = torch.tensor(list(selected_video), device=hidden_states.device)
             sampling_mask[b, video_indices] = False
             sampling_mask[b, selected_video] = True
