@@ -11,6 +11,7 @@ Prompts_suf = f"The best answer is:"
 
 num_mapping = {0: "A", 1: "B", 2: "C"}
 
+
 def parse_video_and_mcq_json(filename):
     with open(filename, "r") as f:
         data = json.load(f)
