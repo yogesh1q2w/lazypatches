@@ -247,9 +247,6 @@ class TaskBasedSampler(Sampler):
                 cosine_sim[selected_video_tokens, :] = -1e9
                 cosine_sim[:, text_idx] = -1e9
 
-            import pdb
-
-            pdb.set_trace()
             assert len(set(selected_video_indices)) == len(selected_video_indices)
 
             selected_video_indices = set(video_indices) if len(selected_video_indices) == 0 else selected_video_indices
