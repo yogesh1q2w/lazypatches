@@ -24,7 +24,8 @@ source .env/bin/activate
 # --For uniform sampler: [0]
 # --For st_gaussian sampler: [0.5, 1, 10]
 # --For km_closest sampler: [0.25, 0.50, 0.75, 1.0]
-# [DROPPING_POSITION] : [0, 12, 24] 
+# --For tb sampler: [0.25, 0.50, 0.75, 1.0]
+# [DROPPING_POSITION] : [0, 4, 12, 20] 
 
 # Example commands: 
 # --no sampler:
@@ -37,8 +38,16 @@ source .env/bin/activate
 #       sbatch launch_job/run_mcq.sh .50 st_gaussian Charades 1 0 
 #       {Dataset is Charades, Hyperparam is 1, retention_rate is 0.50, dropping_position is 0}
 # --km_closest sampler: 
+<<<<<<< Updated upstream
+#       sbatch launch_job/run_mcq.sh 1.0 .50 km_closest Charades 0.50 0 
+#       {Dataset is Charades, Hyperparam is 0.5, retention_rate is 0.50, llm_fps is 1.0, dropping_position is 0}
+=======
 #       sbatch launch_job/run_mcq.sh .50 km_closest Charades 0.50 0 
 #       {Dataset is Charades, Hyperparam is 0.5, retention_rate is 0.50, dropping_position is 0}
+# --tb sampler: 
+#       sbatch launch_job/run_mcq.sh .50 tb Charades 0.50 0 
+#       {Dataset is Charades, Hyperparam is 0.5, retention_rate is 0.50, dropping_position is 0}
+>>>>>>> Stashed changes
 
 TARGET_PATH="/home/atuin/g102ea/shared/group_10/results"
 
