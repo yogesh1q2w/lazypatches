@@ -87,7 +87,6 @@ class CharadesActionMCQ(data.Dataset):
         n_wrong_options=None,
         reload=True,
         use_subset=True,
-        target_fps=2.0,
     ):
         # give either already existing dataset or corresponding paths to build one
         if reload:
@@ -122,7 +121,6 @@ class CharadesActionMCQ(data.Dataset):
                 "n_samples": len(mcq_data["mcqs"]),
             }
             json.dump(self.data, open(dataset_path, "w"))
-        self.target_fps = target_fps
 
     def prepare(self, labels, action_id_mapping, n_wrong_options, videos_path, subset_labels=None):
         question_prompt = open(
@@ -203,8 +201,7 @@ class CharadesActionMCQ(data.Dataset):
         path = self.data["mcq_data"]["video_paths"][index]
         answer = self.data["mcq_data"]["mcq_labels"][index]
 
-        video_info = {"type": "video", "video": path, "fps": self.target_fps}
-        video = fetch_video(video_info)
+        video = fetch_video(path)
         question = self.data["mcq_data"]["mcqs"][index]
 
         return index, video, question, answer

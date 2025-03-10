@@ -189,3 +189,76 @@ class KMclosestTokenSampler(Sampler):
         print(f"SAMPLING RATE FOR KM-CLOSEST(k={self.k}) IS {(1-self.retain_proportion)*100}%")
 
         return hidden_states, video_mask, sampling_mask
+
+
+class TaskBasedSampler(Sampler):
+    def __init__(self, config):
+        super().__init__("tb")
+        self.k = config.k_farthest
+        self.retain_proportion = config.retain_proportion
+        self.budget_temperature = config.budget_temperature
+
+    def sample(self, hidden_states, video_mask, position_ids, input_ids):
+        batch_size, seq_len, d = hidden_states.shape
+        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool, device=video_mask.device)
+        input_ids = input_ids.to(hidden_states.device)
+
+        for b in range(batch_size):
+
+            text_indices = (video_mask[b] == 0).nonzero(as_tuple=True)[0].unique()
+            video_indices = (video_mask[b] == 1).nonzero(as_tuple=True)[0].unique()
+            lower_text_bound = (input_ids[b][text_indices] == 151653).nonzero(as_tuple=True)[
+                0
+            ].item() + 1  # User input text starts after |vision_end| token whose token id is 151653, this is index in text_indices
+            upper_text_bound = (
+                lower_text_bound
+                + (input_ids[0][text_indices][lower_text_bound:] == 151645).nonzero(as_tuple=True)[0].item()
+            )  # User input ends before the first |im_end| tag after |vision_end| is encountered. Input ID of |im_end| is 151645, index in text_indices
+
+            relevant_text_indices = text_indices[lower_text_bound:upper_text_bound]
+
+            video_embedding = hidden_states[b, video_indices, ...]
+            text_embedding = hidden_states[b, relevant_text_indices, ...]
+
+            cosine_sim = torch.mm(video_embedding, text_embedding.T) / np.sqrt(d)  # should return (M, N)
+
+            cosine_sim = F.softmax(cosine_sim, dim=1)  # should return (M, N)
+
+            num_text_tokens_to_select = int(self.k * len(relevant_text_indices))
+
+            topk_text_tokens = cosine_sim.mean(axis=0).topk(num_text_tokens_to_select)
+            topk_text_similarity = topk_text_tokens.values
+            topk_text_indices = topk_text_tokens.indices
+
+            weights = F.softmax(topk_text_similarity / self.budget_temperature)
+            num_video_tokens_to_select = self.retain_proportion * len(video_indices)
+            n_video_tokens_every_text_token = torch.floor(weights * num_video_tokens_to_select).to(torch.int)
+            if num_video_tokens_to_select > n_video_tokens_every_text_token.sum():
+                n_video_tokens_every_text_token[
+                    n_video_tokens_every_text_token.topk(
+                        int((num_video_tokens_to_select - n_video_tokens_every_text_token.sum()).item())
+                    ).indices
+                ] += 1
+
+            selected_video_indices = []
+            for idx, text_idx in enumerate(topk_text_indices):
+                selected_video_tokens = cosine_sim[:, text_idx].topk(n_video_tokens_every_text_token[idx]).indices
+                selected_video_indices.extend(selected_video_tokens.tolist())
+                cosine_sim[selected_video_tokens, :] = -1e9
+                cosine_sim[:, text_idx] = -1e9
+
+            assert len(set(selected_video_indices)) == len(selected_video_indices)
+
+            selected_video_indices = set(video_indices) if len(selected_video_indices) == 0 else selected_video_indices
+            selected_video_indices = torch.tensor(list(selected_video_indices), device=hidden_states.device)
+            sampling_mask[b, video_indices] = False
+            sampling_mask[b, video_indices[selected_video_indices]] = True
+
+        hidden_states = hidden_states * sampling_mask.float()
+        video_mask = video_mask & sampling_mask
+
+        print(
+            f"SAMPLING RATE FOR TASK-BASED(k={self.k}, T={self.budget_temperature}) IS {(1-self.retain_proportion)*100}%"
+        )
+
+        return hidden_states, video_mask, sampling_mask
