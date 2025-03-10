@@ -44,12 +44,11 @@ source .env/bin/activate
 
 TARGET_PATH="/home/atuin/g102ea/shared/group_10/results"
 
-DATASET=$(echo "$4" | tr '[:upper:]' '[:lower:]')
-LLM_FPS="$1"
-RETENTION_RATE="$2"
-SAMPLER_TYPE="$3"
+DATASET=$(echo "$1" | tr '[:upper:]' '[:lower:]')
+RETENTION_RATE="$4"
+SAMPLER_TYPE="$2"
 HYPERPARAM="$5"
-DROPPING_POSITION="$6"
+DROPPING_POSITION="$3"
 
 if [ "$SAMPLER_TYPE" = "None" ]; then
     TARGET_PATH="${TARGET_PATH}/baseline"

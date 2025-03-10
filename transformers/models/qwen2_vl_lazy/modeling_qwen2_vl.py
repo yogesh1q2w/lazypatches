@@ -50,6 +50,7 @@ from ...utils import (
     logging,
     replace_return_docstrings,
 )
+from inference.arg_idx import *
 
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
 from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler, KMclosestTokenSampler, TaskBasedSampler
@@ -66,9 +67,8 @@ logger = logging.get_logger(__name__)
 
 _CONFIG_FOR_DOC = "Qwen2VLConfig"
 
-RETENTION_RATE = float(sys.argv[2])
-SAMPLER_TYPE = sys.argv[3]
-LLM_FPS = float(sys.argv[1])
+RETENTION_RATE = float(sys.argv[RETENTION_RATE_ARG_IDX])
+SAMPLER_TYPE = sys.argv[SAMPLER_TYPE_ARG_IDX]
 
 
 @dataclass

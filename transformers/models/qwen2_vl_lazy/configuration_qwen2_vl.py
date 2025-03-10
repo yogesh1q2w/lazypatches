@@ -19,6 +19,8 @@ from ...configuration_utils import PretrainedConfig
 from ...modeling_rope_utils import rope_config_validation
 from ...utils import logging
 
+from inference.arg_idx import *
+
 
 logger = logging.get_logger(__name__)
 
@@ -218,12 +220,12 @@ class Qwen2VLConfig(PretrainedConfig):
         attention_dropout=0.0,
         vision_config=None,
         rope_scaling=None,
-        dropping_position=int(sys.argv[6]),
-        selector_implementation=sys.argv[3],
-        retain_proportion=float(sys.argv[2]),
-        temporal_variance=float(sys.argv[5]),
-        spatial_variance=float(sys.argv[5]),
-        k_farthest=float(sys.argv[5]),
+        dropping_position=int(sys.argv[DROPPING_POSITION_ARG_IDX]),
+        selector_implementation=sys.argv[SAMPLER_TYPE_ARG_IDX],
+        retain_proportion=float(sys.argv[RETENTION_RATE_ARG_IDX]),
+        temporal_variance=float(sys.argv[HYPERPARAM_ARG_IDX]),
+        spatial_variance=float(sys.argv[HYPERPARAM_ARG_IDX]),
+        k_farthest=float(sys.argv[HYPERPARAM_ARG_IDX]),
         budget_temperature=0.05,
         **kwargs,
     ):

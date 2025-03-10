@@ -3,13 +3,14 @@ import sys
 import torch
 import json
 import logging
-import re
+import time
 from torch.utils.data import DataLoader
 
 from transformers.models.qwen2_vl_lazy import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
 from eval.accuracy_mcq import IncrementalMCQAcc
 from dataset.charades_mcq import CharadesActionMCQ
 from dataset.perceptiontest_mcq import PerceptiontestMCQ
+from inference.arg_idx import *
 
 DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 SAVE_EVERY = 100
@@ -17,13 +18,14 @@ SAVE_EVERY = 100
 MODEL_CHECKPOINT_PATH = "/home/atuin/g102ea/shared/group_10/model_checkpoints/qwen2vl-7b-instruct"
 
 # argument list by order: [LLM_FPS] [RETENTION_RATE] [SAMPLER_TYPE] [DATASET] [HYPERPARAM] [DROPPING_POSITION]
-LLM_FPS = float(sys.argv[1])
-RETENTION_RATE = float(sys.argv[2])
-SAMPLER_TYPE = sys.argv[3]
-DATASET = sys.argv[4].lower()
-HYPERPARAM = float(sys.argv[5])
-DROPPING_POSITION = int(sys.argv[6])
-TARGET_PATH = sys.argv[7]
+
+
+RETENTION_RATE = float(sys.argv[RETENTION_RATE_ARG_IDX])
+SAMPLER_TYPE = sys.argv[SAMPLER_TYPE_ARG_IDX]
+DATASET = sys.argv[DATASET_ARG_IDX].lower()
+HYPERPARAM = float(sys.argv[HYPERPARAM_ARG_IDX])
+DROPPING_POSITION = int(sys.argv[DROPPING_POSITION_ARG_IDX])
+TARGET_PATH = sys.argv[TARGET_PATH_ARG_IDX]
 
 ROOT_PATH = "/home/atuin/g102ea/shared/group_10/datasets"
 DATASET_PATH = os.path.join(ROOT_PATH, DATASET)
@@ -85,20 +87,16 @@ for step, data in enumerate(data_loader):
 
     if DATASET == "charades":
         idx, video, question, answer = data
-        question = question[0]
-        answer = answer[0]
-        answer = next(f"{i}" for i, t in re.findall(r"\((\d+)\) (.+)", question) if t.strip() == answer.strip())
         area, tag = None, None
-
     elif DATASET == "perceptiontest":
         idx, video, question, answer, area, tag = data
-        question = question[0]
-        answer = answer[0]
         area = area[0]
         tag = [i[0] for i in tag]
 
     idx = idx[0]
     video = video.squeeze(0)
+    question = question[0]
+    answer = answer[0]
 
     conversation = [
         {
