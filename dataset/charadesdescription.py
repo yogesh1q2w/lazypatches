@@ -170,7 +170,7 @@ class Charades_decription(data.Dataset):
         meta["id"] = self.data["ids"][index]
 
         video_info = {"type": "video", "video": path, "fps": 1.0}
-        video = fetch_video(video_info)
+        video = fetch_video(video_info[path])
         text = "Describe the video."
         print(path)
 

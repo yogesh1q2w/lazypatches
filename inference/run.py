@@ -17,8 +17,8 @@ processor = Qwen2VLProcessor.from_pretrained(checkpoint_path)
 print("Loading model complete")
 
 # Video
-video_info = {"type": "video", "video": "./test_files/monkey.gif", "fps": 1.0}
-video = fetch_video(video_info)
+video_info = {"type": "video", "path": "./test_files/monkey.gif", "fps": 1.0}
+video = fetch_video(video_info["path"])
 conversation = [
     {
         "role": "user",

@@ -157,7 +157,7 @@ class PerceptiontestMCQ(data.Dataset):
         answer = self.data["mcq_data"]["mcq_labels"][index]
 
         video_info = {"type": "video", "video": path, "fps": self.target_fps}
-        video = fetch_video(video_info)
+        video = fetch_video(video_info["path"])
         question = self.data["mcq_data"]["mcqs"][index]
 
         area = self.data["mcq_data"]["mcq_areas"][index]
