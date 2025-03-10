@@ -52,7 +52,7 @@ from ...utils import (
 )
 from .lazy_utils import fps_reduction
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
-from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler, KMclosestTokenSampler
+from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler, KMclosestTokenSampler, TaskBasedSampler
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -880,6 +880,7 @@ QWEN2_VL_SAMPLER_CLASSES = {
     "uniform": UniformSampler,
     "st_gaussian": SpatioTemporalHeuristicSampler,
     "km_closest": KMclosestTokenSampler,
+    "tb": TaskBasedSampler,
 }
 
 

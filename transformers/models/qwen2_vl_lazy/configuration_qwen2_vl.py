@@ -224,6 +224,7 @@ class Qwen2VLConfig(PretrainedConfig):
         temporal_variance=float(sys.argv[5]),
         spatial_variance=float(sys.argv[5]),
         k_farthest=float(sys.argv[5]),
+        budget_temperature=0.05,
         **kwargs,
     ):
         if isinstance(vision_config, dict):
@@ -260,6 +261,7 @@ class Qwen2VLConfig(PretrainedConfig):
         self.temporal_variance = temporal_variance
         self.spatial_variance = spatial_variance
         self.k_farthest = k_farthest
+        self.budget_temperature = budget_temperature
 
         # Validate the correctness of rotary position embeddings parameters
         # BC: if there is a 'type' field, move it to 'rope_type'.
