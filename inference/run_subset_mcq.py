@@ -101,7 +101,7 @@ for step, data in enumerate(data_loader):
 
     idx = idx[0]
     video = video.squeeze(0)
-    
+
     conversation = [
         {
             "role": "user",
@@ -126,7 +126,7 @@ for step, data in enumerate(data_loader):
         print(f"Correct answer = {answer}", flush=True)
         print(f"Output answer = {output_text[0]}", flush=True)
         print(f"Is correct = {is_correct}", flush=True)
-        
+
         results.append(
             {
                 "idx": int(idx),
