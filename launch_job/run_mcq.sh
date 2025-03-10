@@ -20,7 +20,7 @@ source .env/bin/activate
 
 # [LLM_FPS] : [0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 1.75, 2]; CHANGES ONLY FOR BASELINE W/O SAMPLING + ANALYSIS EXP FOR BEST SAMPLING RATE + SAMPLING POSITION
 # [RETENTION_RATE] : [.10, .30, .50, .70, .90] CHANGES FOR ALL EXPERIMENTS BAR BEST SAMPLING RATE EXPERIMENT
-# [SAMPLER_TYPE] : [None, uniform, st_gaussian, km_closest] 
+# [SAMPLER_TYPE] : [None, uniform, st_gaussian, km_closest, tb] 
 # [DATASET] : [Charades, PerceptionTest]
 # [HYPERPARAM] : 
 # --For uniform sampler: [0]
