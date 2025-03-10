@@ -3,7 +3,7 @@ import sys
 import torch
 import json
 import logging
-import time
+import re
 from torch.utils.data import DataLoader
 
 from transformers.models.qwen2_vl_lazy import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
@@ -87,17 +87,21 @@ for step, data in enumerate(data_loader):
 
     if DATASET == "charades":
         idx, video, question, answer = data
+        question = question[0]
+        answer = answer[0]
+        answer = next(f"{i}" for i, t in re.findall(r"\((\d+)\) (.+)", question) if t.strip() == answer.strip())
         area, tag = None, None
+
     elif DATASET == "perceptiontest":
         idx, video, question, answer, area, tag = data
+        question = question[0]
+        answer = answer[0]
         area = area[0]
         tag = [i[0] for i in tag]
 
     idx = idx[0]
     video = video.squeeze(0)
-    question = question[0]
-    answer = answer[0]
-
+    
     conversation = [
         {
             "role": "user",
@@ -116,14 +120,13 @@ for step, data in enumerate(data_loader):
         output_ids = model.generate(**inputs, max_new_tokens=128)
         generated_ids = [output_ids[len(input_ids) :] for input_ids, output_ids in zip(inputs.input_ids, output_ids)]
         output_text = processor.batch_decode(generated_ids, skip_special_tokens=True, clean_up_tokenization_spaces=True)
+        is_correct = metrics.eval_results(answer, output_text[0], area, tag)
 
         print(f"{idx} {question}", flush=True)
         print(f"Correct answer = {answer}", flush=True)
         print(f"Output answer = {output_text[0]}", flush=True)
-        print("-------------------", flush=True)
-
-        is_correct = metrics.eval_results(answer, output_text[0], area, tag)
-
+        print(f"Is correct = {is_correct}", flush=True)
+        
         results.append(
             {
                 "idx": int(idx),

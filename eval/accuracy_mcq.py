@@ -75,7 +75,7 @@ class IncrementalMCQAcc:
 
     def __init__(self, dataset):
         self.total = {"correct": 0, "answered": 0}
-        self.option_regex = "12345" if dataset is "charades" else "ABC"
+        self.option_regex = "12345" if dataset == "charades" else "ABC"
 
         self.q_areas = {}
         for area in AREAS:
