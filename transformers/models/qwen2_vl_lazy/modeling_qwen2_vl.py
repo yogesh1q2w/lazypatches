@@ -790,6 +790,16 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         key_states = self.k_proj(hidden_states)
         value_states = self.v_proj(hidden_states)
 
+        # handles only batch size 1
+        assert query_states.shape[0] == 1 and key_states.shape[0] == 1 and value_states.shape[0] == 1
+
+        drop_indices = None
+        if sampling_mask is not None:
+            drop_indices = torch.nonzero(~sampling_mask[0], as_tuple=True)[0].unique()
+            query_states[0, drop_indices, ...] = 0
+            key_states[0, drop_indices, ...] = 0
+            value_states[0, drop_indices, ...] = 0
+
         query_states = query_states.view(bsz, q_len, self.num_heads, self.head_dim).transpose(1, 2)
         key_states = key_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
         value_states = value_states.view(bsz, q_len, self.num_key_value_heads, self.head_dim).transpose(1, 2)
@@ -834,6 +844,9 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         causal_mask = attention_mask
         if attention_mask is not None:  # no matter the length, we just slice it
             causal_mask = attention_mask[:, :, :, : key_states.shape[-2]]
+            if drop_indices is not None:
+                causal_mask[:, :, drop_indices, :] = False
+                causal_mask[:, :, :, drop_indices] = False
 
         # SDPA with memory-efficient backend is currently (torch==2.1.2) bugged with non-contiguous inputs with custom attn_mask,
         # Reference: https://github.com/pytorch/pytorch/issues/112577.
@@ -846,6 +859,12 @@ class Qwen2VLSdpaAttention(Qwen2VLAttention):
         # in SDPA to support both torch.compile's dynamic shapes and full graph options. An inline conditional prevents dynamic shapes from compiling.
         # The q_len > 1 is necessary to match with AttentionMaskConverter.to_causal_4d that does not create a causal mask in case q_len == 1.
         is_causal = True if causal_mask is None and q_len > 1 else False
+
+        if is_causal and drop_indices is not None:
+            causal_mask = torch.ones(key_states.shape[-2], key_states.shape[-2], device=key_states.device)
+            causal_mask[:, drop_indices] = False
+            causal_mask[drop_indices, :] = False
+            causal_mask = causal_mask > 0
 
         attn_output = torch.nn.functional.scaled_dot_product_attention(
             query_states,
