@@ -6,7 +6,7 @@ echo "Recording job IDs in $job_log"
 echo "Command | Job ID" > "$job_log"
 echo "-----------------" >> "$job_log"
 
-Drop=  # Set your dropping position number here
+Drop  # Set your dropping position number here
 
 for retention in 0.10 0.30 0.50 0.70 0.90; do
     for sampler in uniform st_gaussian tb; do
