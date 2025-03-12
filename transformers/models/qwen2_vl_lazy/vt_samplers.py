@@ -28,19 +28,16 @@ class UniformSampler(Sampler):
         sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)
 
         for b in range(batch_size):
-            true_indices = torch.nonzero(video_mask[b].flatten(), as_tuple=True)[0]
+            true_indices = torch.nonzero(video_mask[b], as_tuple=True)[0].unique()
             num_to_drop = int((1 - self.retain_proportion) * true_indices.size(0))
 
-            drop_indices = true_indices[torch.randperm(true_indices.size(0))[:num_to_drop]]
+            drop_indices = true_indices[torch.randperm(true_indices.shape[0])[:num_to_drop]]
 
-            flat_sampling_mask = sampling_mask[b].flatten()
-            flat_sampling_mask[drop_indices] = False
-
-            sampling_mask[b] = flat_sampling_mask.view(video_mask[b].shape)
+            sampling_mask[b, drop_indices, ...] = False
 
         hidden_states = hidden_states * sampling_mask.float()
         video_mask = video_mask & sampling_mask
-
+        
         print(f"SAMPLING RATE FOR UNIFORM IS {(1-self.retain_proportion)*100}%")
 
         return hidden_states, video_mask, sampling_mask
