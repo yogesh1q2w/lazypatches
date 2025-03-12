@@ -223,7 +223,7 @@ class Qwen2VLConfig(PretrainedConfig):
         dropping_position=int(sys.argv[DROPPING_POSITION_ARG_IDX]),
         selector_implementation=sys.argv[SAMPLER_TYPE_ARG_IDX],
         retain_proportion=float(sys.argv[RETENTION_RATE_ARG_IDX]),
-        temporal_variance=float(sys.argv[HYPERPARAM_ARG_IDX]),
+        temporal_variance=10,
         spatial_variance=float(sys.argv[HYPERPARAM_ARG_IDX]),
         k_farthest=float(sys.argv[HYPERPARAM_ARG_IDX]),
         budget_temperature=0.05,
