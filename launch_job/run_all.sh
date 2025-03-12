@@ -3,6 +3,8 @@
 # Create or clear a file to store job IDs
 job_log="job_ids.log"
 echo "Appending job IDs to $job_log"
+echo "Command | Job ID" >> "$job_log"
+echo "-----------------" >> "$job_log"
 
 Drop  # Set your dropping position number here
 
