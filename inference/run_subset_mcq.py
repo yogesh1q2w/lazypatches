@@ -2,6 +2,7 @@ import os
 import sys
 import torch
 import json
+import pickle
 import logging
 import re
 import numpy as np
@@ -145,10 +146,10 @@ for step, data in enumerate(data_loader):
         torch.cuda.empty_cache()
 
     if step % SAVE_EVERY == 0:
-        json.dump(model.model.MASKS, open(os.path.join(TARGET_PATH, "masks.json"), "wb"))
-        json.dump(model.model.COSINE_SIM, open(os.path.join(TARGET_PATH, "cosine_sim.json"), "wb"))
-        json.dump(model.model.INPUT_IDS, open(os.path.join(TARGET_PATH, "input_ids.json"), "wb"))
-    #     json.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
+        pickle.dump(model.model.MASKS, open(os.path.join(TARGET_PATH, "masks.json"), "wb"))
+        pickle.dump(model.model.COSINE_SIM, open(os.path.join(TARGET_PATH, "cosine_sim.json"), "wb"))
+        pickle.dump(model.model.INPUT_IDS, open(os.path.join(TARGET_PATH, "input_ids.json"), "wb"))
+    #     pickle.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
     #     json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
     #     logger.info(f"---Saved till step {step}----")
 
@@ -158,9 +159,9 @@ for step, data in enumerate(data_loader):
 
     torch.cuda.empty_cache()
 
-json.dump(model.model.MASKS, open(os.path.join(TARGET_PATH, "masks.json"), "wb"))
-json.dump(model.model.COSINE_SIM, open(os.path.join(TARGET_PATH, "cosine_sim.json"), "wb"))
-json.dump(model.model.INPUT_IDS, open(os.path.join(TARGET_PATH, "input_ids.json"), "wb"))
+pickle.dump(model.model.MASKS, open(os.path.join(TARGET_PATH, "masks.json"), "wb"))
+pickle.dump(model.model.COSINE_SIM, open(os.path.join(TARGET_PATH, "cosine_sim.json"), "wb"))
+pickle.dump(model.model.INPUT_IDS, open(os.path.join(TARGET_PATH, "input_ids.json"), "wb"))
 # json.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
 # json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
 
