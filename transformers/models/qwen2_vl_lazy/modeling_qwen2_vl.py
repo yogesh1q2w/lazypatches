@@ -53,7 +53,7 @@ from ...utils import (
 from inference.arg_idx import *
 
 from .configuration_qwen2_vl import Qwen2VLConfig, Qwen2VLVisionConfig
-from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler, KMclosestTokenSampler, TaskBasedSampler
+from .vt_samplers import UniformSampler, SpatioTemporalHeuristicSampler, KMclosestTokenSampler, TaskBasedSampler, TemporalSampler
 
 if is_flash_attn_2_available():
     from flash_attn import flash_attn_varlen_func
@@ -896,6 +896,7 @@ QWEN2_VL_ATTENTION_CLASSES = {
 }
 
 QWEN2_VL_SAMPLER_CLASSES = {
+    "temporal" : TemporalSampler,
     "uniform": UniformSampler,
     "st_gaussian": SpatioTemporalHeuristicSampler,
     "km_closest": KMclosestTokenSampler,

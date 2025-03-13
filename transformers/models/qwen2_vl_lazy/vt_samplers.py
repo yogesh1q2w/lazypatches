@@ -2,6 +2,7 @@ import numpy as np
 import torch
 import torch.nn.functional as F
 import abc
+import math
 import random
 
 
@@ -15,6 +16,38 @@ class Sampler(abc.ABC):
 
     def __call__(self, hidden_states, video_mask, position_ids, input_ids):
         return self.sample(hidden_states, video_mask, position_ids, input_ids)
+
+
+class TemporalSampler(Sampler):
+    def __init__(self, config):
+        super().__init__("temporal")
+        self.retain_proportion = config.retain_proportion
+
+    def sample(self, hidden_states, video_mask, position_ids, input_ids):
+        batch_size, seq_len, embed_dim = hidden_states.shape
+        sampling_mask = torch.ones_like(video_mask, dtype=torch.bool)
+
+        for b in range(batch_size):
+            video_tokens = video_mask[b].sum(axis=-1) > 0
+            sampling_mask[b, video_tokens, ...] = False
+            t_indices = position_ids[0, b]
+            t_tokens = t_indices[video_tokens]
+            
+            num_keep = math.ceil(len(t_tokens.unique()) * self.retain_proportion)
+            lin_indices = torch.linspace(min(t_tokens), max(t_tokens), steps=num_keep, device=t_indices.device).long()
+            
+            mask = torch.isin(t_indices, lin_indices)
+            video_tokens = video_tokens & mask
+            embed_mask = video_tokens.unsqueeze(1).expand_as(sampling_mask[b])  # Expand mask to match embedding shape
+            
+            sampling_mask[b] = sampling_mask[b] | embed_mask
+
+        hidden_states = hidden_states * sampling_mask.float()
+        video_mask = video_mask & sampling_mask
+
+        print(f"SAMPLING RATE FOR TEMPORAL IS {(1-self.retain_proportion)*100}%")
+
+        return hidden_states, video_mask, sampling_mask
 
 
 class UniformSampler(Sampler):
