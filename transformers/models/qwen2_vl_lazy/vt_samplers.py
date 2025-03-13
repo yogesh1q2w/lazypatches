@@ -254,7 +254,7 @@ class TaskBasedSampler(Sampler):
 
             cosine_sim = F.softmax(cosine_sim, dim=1)  # should return (M, N)
 
-            num_text_tokens_to_select = int(self.k * len(relevant_text_indices))
+            num_text_tokens_to_select = max(1, int(self.k * len(relevant_text_indices)))
 
             topk_text_tokens = cosine_sim.mean(axis=0).topk(num_text_tokens_to_select)
             topk_text_similarity = topk_text_tokens.values
