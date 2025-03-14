@@ -220,6 +220,7 @@ class TaskBasedSampler(Sampler):
             cosine_sim = torch.mm(video_embedding, text_embedding.T) / np.sqrt(d)  # should return (M, N)
 
             cosine_sim = F.softmax(cosine_sim, dim=1)  # should return (M, N)
+            return_cosine_sim = cosine_sim.clone()
 
             num_text_tokens_to_select = int(self.k * len(relevant_text_indices))
 
@@ -258,4 +259,5 @@ class TaskBasedSampler(Sampler):
             f"SAMPLING RATE FOR TASK-BASED(k={self.k}, T={self.budget_temperature}) IS {(1-self.retain_proportion)*100}%"
         )
 
-        return hidden_states, video_mask, sampling_mask
+        T, H, W = position_ids[0, 0][video_indices].unique().shape[0], position_ids[1, 0][video_indices].unique().shape[0], position_ids[2, 0][video_indices].unique().shape[0]
+        return hidden_states, (video_mask[0, video_indices].sum(axis=-1) > 0).reshape(T, H, W), sampling_mask[0, video_indices][:, 0].detach().cpu().numpy(), return_cosine_sim.detach().cpu().numpy(), input_ids[0,relevant_text_indices].detach().cpu().numpy()

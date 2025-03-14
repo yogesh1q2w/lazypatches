@@ -2,8 +2,10 @@ import os
 import sys
 import torch
 import json
+import pickle
 import logging
 import re
+import numpy as np
 from torch.utils.data import DataLoader
 
 from transformers.models.qwen2_vl_lazy import Qwen2VLForConditionalGeneration, Qwen2VLProcessor
@@ -77,8 +79,8 @@ metrics = IncrementalMCQAcc(DATASET)
 
 data_loader = DataLoader(dataset=dataset, batch_size=1, shuffle=False)
 print("Length of dataset: ", len(dataset), flush=True)
-results = []
-failed_indices = []
+# results = []
+# failed_indices = []
 
 for step, data in enumerate(data_loader):
 
@@ -123,51 +125,57 @@ for step, data in enumerate(data_loader):
         is_correct = metrics.eval_results(answer, output_text[0], area, tag)
 
         print(f"{idx} {question}", flush=True)
-        print(f"Correct answer = {answer}", flush=True)
-        print(f"Output answer = {output_text[0]}", flush=True)
-        print(f"Is correct = {is_correct}", flush=True)
+        # print(f"Correct answer = {answer}", flush=True)
+        # print(f"Output answer = {output_text[0]}", flush=True)
+        # print(f"Is correct = {is_correct}", flush=True)
 
-        results.append(
-            {
-                "idx": int(idx),
-                "question": question,
-                "answer": answer,
-                "prediction": output_text,
-                "is_correct": is_correct,
-            }
-        )
+        # results.append(
+        #     {
+        #         "idx": int(idx),
+        #         "question": question,
+        #         "answer": answer,
+        #         "prediction": output_text,
+        #         "is_correct": is_correct,
+        #     }
+        # )
         torch.cuda.empty_cache()
 
     except Exception as e:
         logger.info(f"Exception thrown is {e}")
-        failed_indices.append(int(idx))
+        # failed_indices.append(int(idx))
         torch.cuda.empty_cache()
 
     if step % SAVE_EVERY == 0:
-        json.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
-        json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
-        logger.info(f"---Saved till step {step}----")
+        pickle.dump(model.model.MASKS, open(os.path.join(TARGET_PATH, "masks.json"), "wb"))
+        pickle.dump(model.model.COSINE_SIM, open(os.path.join(TARGET_PATH, "cosine_sim.json"), "wb"))
+        pickle.dump(model.model.INPUT_IDS, open(os.path.join(TARGET_PATH, "input_ids.json"), "wb"))
+    #     pickle.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
+    #     json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
+    #     logger.info(f"---Saved till step {step}----")
 
-        logger.info(
-            f"Processed {step}/{len(dataset)} - Current Accuracy: {metrics.get_total_accuracy():.4f} ({metrics.total['correct']}/{metrics.total['answered']}), Failed = {len(failed_indices)}"
-        )
+    #     logger.info(
+    #         f"Processed {step}/{len(dataset)} - Current Accuracy: {metrics.get_total_accuracy():.4f} ({metrics.total['correct']}/{metrics.total['answered']}), Failed = {len(failed_indices)}"
+    #     )
 
     torch.cuda.empty_cache()
 
-json.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
-json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
+pickle.dump(model.model.MASKS, open(os.path.join(TARGET_PATH, "masks.json"), "wb"))
+pickle.dump(model.model.COSINE_SIM, open(os.path.join(TARGET_PATH, "cosine_sim.json"), "wb"))
+pickle.dump(model.model.INPUT_IDS, open(os.path.join(TARGET_PATH, "input_ids.json"), "wb"))
+# json.dump(results, open(os.path.join(TARGET_PATH, "results.json"), "w"))
+# json.dump(failed_indices, open(os.path.join(TARGET_PATH, "failed_indices.json"), "w"))
 
 
-print("-------------------", flush=True)
-correct = metrics.total["correct"]
-total_attempts = metrics.total["answered"] + len(failed_indices)
-failure_rate = len(failed_indices) / total_attempts if total_attempts > 0 else 0
-logger.info("\nFinal Evaluation Results:")
-logger.info(f"Processed Samples: {total_attempts}")
-logger.info(f"Failed Samples: {len(failed_indices)}")
-logger.info(f"Accuracy: {metrics.get_total_accuracy():.4f} ({metrics.total['correct']}/{metrics.total['answered']})")
-logger.info(f"Failure Rate: {failure_rate:.4f}")
-if DATASET == "perceptiontest":
-    area_accuracy, tag_accuracy = metrics.get_area_and_tag_accuracy()
-    logger.info(f"Area accuracy = {area_accuracy}")
-    logger.info(f"Tag accuracy = {tag_accuracy}")
+# print("-------------------", flush=True)
+# correct = metrics.total["correct"]
+# total_attempts = metrics.total["answered"] + len(failed_indices)
+# failure_rate = len(failed_indices) / total_attempts if total_attempts > 0 else 0
+# logger.info("\nFinal Evaluation Results:")
+# logger.info(f"Processed Samples: {total_attempts}")
+# logger.info(f"Failed Samples: {len(failed_indices)}")
+# logger.info(f"Accuracy: {metrics.get_total_accuracy():.4f} ({metrics.total['correct']}/{metrics.total['answered']})")
+# logger.info(f"Failure Rate: {failure_rate:.4f}")
+# if DATASET == "perceptiontest":
+#     area_accuracy, tag_accuracy = metrics.get_area_and_tag_accuracy()
+#     logger.info(f"Area accuracy = {area_accuracy}")
+#     logger.info(f"Tag accuracy = {tag_accuracy}")

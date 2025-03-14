@@ -1147,6 +1147,9 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         self.gradient_checkpointing = False
         # Initialize weights and apply final processing
         self.post_init()
+        self.MASKS = []
+        self.COSINE_SIM = []
+        self.INPUT_IDS = []
 
     def get_input_embeddings(self):
         return self.embed_tokens
@@ -1233,12 +1236,16 @@ class Qwen2VLModel(Qwen2VLPreTrainedModel):
         for idx, decoder_layer in enumerate(self.layers):
             if idx == self.dropping_position and self.sampler is not None:
                 if video_mask.any().item():
-                    hidden_states, video_mask, sampling_mask = self.sampler(
+                    hidden_states, video_mask, sampling_mask, save_cosine_sim, save_input_ids= self.sampler(
                         hidden_states, video_mask, position_ids, input_ids
                     )
                     print(
                         f">>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>{self.config.selector_implementation} Subsampled tokens at layer {idx}!!!<<<<<<<<<<<<<<<<<<<<<<<<<<<<"
                     )
+                    self.COSINE_SIM.append(save_cosine_sim.tolist())
+                    self.MASKS.append(video_mask.tolist())
+                    self.INPUT_IDS.append(save_input_ids.tolist())
+                    return None
 
             if output_hidden_states:
                 all_hidden_states += (hidden_states,)
