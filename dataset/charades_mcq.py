@@ -104,7 +104,7 @@ class CharadesActionMCQ(data.Dataset):
             action_id_mapping = parse_action_id_mapping(classes_path)
 
             if use_subset:
-                with open("/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades.json", "r") as f:
+                with open("/home/atuin/g102ea/shared/group_10/datasets/charades/subset_charades_hard.json", "r") as f:
                     subset_data = json.load(f)
 
                 subset_labels = extract_subset_data(labels_path, subset_data)
