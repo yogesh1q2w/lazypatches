@@ -6,6 +6,7 @@
 #SBATCH --export=None
 
 cd /home/hpc/g102ea/appropriate_path/lazypatches/  # UPDATE ME! AND DON'T PUSH!
+
 module add python
 conda activate m3project
 source .env/bin/activate
@@ -44,7 +45,7 @@ source .env/bin/activate
 #       sbatch launch_job/run_mcq.sh .50 tb Charades 0.50 0 
 #       {Dataset is Charades, Hyperparam is 0.5, retention_rate is 0.50, dropping_position is 0}
 
-TARGET_PATH="/home/atuin/g102ea/shared/group_10/results"
+TARGET_PATH="/home/atuin/g102ea/shared/group_10/results_hard"
 
 DATASET=$(echo "$3" | tr '[:upper:]' '[:lower:]')
 RETENTION_RATE="$1"
